@@ -1,10 +1,15 @@
-import requests
-import json
 import os
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
 from helper.standard import retrieve_via_url, URL_ENDING_PULLS, URL_ENDING_ISSUES
+
+load_dotenv()
+
+ACCESS_TOKEN = os.getenv('GITHUB_ACCESS_TOKEN')
+
+OWNER = 'dbpedia'
+REPO = 'dbpedia-chatbot-backend'
 
 def substract_and_format_time(start, end):
     time_diff = end - start
@@ -43,17 +48,7 @@ def calculate_till_first_comment(pr, owner, repo, skip_comments_from_author=True
     else:
         return None
 
-
-load_dotenv()
-
-ACCESS_TOKEN = os.getenv('GITHUB_ACCESS_TOKEN')
-
-OWNER = 'dbpedia'
-REPO = 'dbpedia-chatbot-backend'
-
-pull_requests = retrieve_via_url(OWNER, REPO, ACCESS_TOKEN, URL_ENDING_PULLS, 'state=all')
-
-
+pull_requests = retrieve_via_url(OWNER, REPO, ACCESS_TOKEN, URL_ENDING_PULLS, {'state': 'all'})
 results = []
 
 for pull_request in pull_requests:
@@ -69,4 +64,4 @@ for pull_request in pull_requests:
     }) 
 
 df = pd.DataFrame(results)
-df.to_csv('results.csv', index=False)
+df.to_csv('pull_requests.csv', index=False)
