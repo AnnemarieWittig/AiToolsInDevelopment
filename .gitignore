@@ -1,3 +1,4 @@
 .env
 venv/
-*/__pycache__
+__pycache__/
+ex_answer_objects
