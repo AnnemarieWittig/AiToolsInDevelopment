@@ -16,7 +16,7 @@ REPO = os.getenv('REPO')
 storage_path = os.getenv('STORAGE_PATH') + '/workflow_runs.csv'
 
 # Get all runs
-workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN, 5)
+workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN)
 # Safety net
 with open(storage_path.replace('.csv', '.json'), 'w') as file:
     json.dump(workflow_runs, file)

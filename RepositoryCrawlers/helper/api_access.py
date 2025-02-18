@@ -156,7 +156,7 @@ def retrieve_workflow_runs(owner, repo, access_token, max_pages=None):
     :rtype: list
     """
     # Use the GitHub API to retrieve workflow runs
-    workflow_runs = retrieve_via_url(owner, repo, access_token, WORKLFOW_RUNS, {'per_page': 100}, paginate=True, max_pages)
+    workflow_runs = retrieve_via_url(owner, repo, access_token, WORKLFOW_RUNS, {'per_page': 100}, paginate=True, max_pages=max_pages)
     runs = []
 
     for run in workflow_runs:
