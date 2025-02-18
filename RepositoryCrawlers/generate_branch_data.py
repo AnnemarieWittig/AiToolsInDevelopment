@@ -1,16 +1,18 @@
 import os
-from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.api_access import retrieve_workflow_runs
-from helper.standard import retrieve_branches
-import json
+from helper.console_access import retrieve_branch_data_new
+
 load_dotenv()
 
-
+# Setup
 REPO_PATH = os.getenv('REPO_PATH')
+MAIN_BRANCH = os.getenv('MAIN_BRANCH')
+storage_path = os.getenv('STORAGE_PATH') + '/branches.csv'
 
-branches = retrieve_branches(REPO_PATH)
+# Retrieve Branches
+branches = retrieve_branch_data_new(REPO_PATH, MAIN_BRANCH)
 
+# Store
 df = pd.DataFrame(branches)
-df.to_csv('branches.csv', index=False)
+df.to_csv(storage_path, index=False)

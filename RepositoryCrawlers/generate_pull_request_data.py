@@ -2,19 +2,24 @@ import os, json
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.standard import run_git_command, substract_and_format_time, retrieve_pull_requests
+from helper.console_access import run_git_command, substract_and_format_time, retrieve_pull_requests_parallel
 from helper.api_access import retrieve_pull_request_details
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
+# Setup
 ACCESS_TOKEN = os.getenv('GITHUB_ACCESS_TOKEN')
-OWNER = os.getenv('OWNER')  # Update with actual owner if needed
-REPO = os.getenv('REPO')  # Update with actual repo if needed
+OWNER = os.getenv('OWNER')  
+REPO = os.getenv('REPO') 
 REPO_PATH = os.getenv('REPO_PATH')
 BOT_USERS = ['dependabot-preview[bot]', 'dependabot[bot]', 'renovate[bot]']
+storage_path = os.getenv('STORAGE_PATH') + '/pull_requests.json'
 
 def calculate_till_first_comment(pr_number, created_at, repo_path, skip_comments_from_author=True):
-    print(f"PR #{pr_number} - Created at: {created_at}")
+    logging.info(f"PR #{pr_number} - Created at: {created_at}")
 
     # Retrieve comments using git notes
     comments_args = ["notes", "--ref", f"refs/notes/pull/{pr_number}/comments"]
@@ -36,9 +41,14 @@ def calculate_till_first_comment(pr_number, created_at, repo_path, skip_comments
         return time_to_first_comment
     else:
         return None
+    
+# Retrieve Pull Request
+pull_requests = retrieve_pull_requests_parallel(REPO_PATH, 1)
 
-pull_requests = retrieve_pull_requests(REPO_PATH)
-print(json.dumps(pull_requests, indent=4))
+logging.info(f'found {len(pull_requests)} pull requests')
+# Safety Storage
+with open(storage_path, 'w') as file:
+    json.dump(pull_requests, file)
 results = []
 
 for pull_request in pull_requests:
@@ -61,10 +71,10 @@ for pull_request in pull_requests:
     labels = [label['name'] for label in pr_details['labels']]
     assignees = [assignee['login'] for assignee in pr_details['assignees']]
 
-    # Calculate time until first comment
+    # Calculate time until first comment // Takes too much time realistically
     # time_till_comment = calculate_till_first_comment(pull_request['number'], created_at, REPO_PATH)
 
-    # Calculate time until closed
+    # Calculate time until closed and merged
     time_until_closed = None
     if closed_at:
         start = datetime.fromisoformat(created_at)
@@ -94,5 +104,6 @@ for pull_request in pull_requests:
         pull_request | pr_selection
     )
 
+# Store
 df = pd.DataFrame(results)
-df.to_csv('pull_requests.csv', index=False)
+df.to_csv(storage_path.replace('.json', '.csv'), index=False)

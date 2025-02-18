@@ -3,19 +3,41 @@ from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
 from helper.api_access import retrieve_workflow_runs
-from helper.standard import substract_and_format_time
+from helper.console_access import substract_and_format_time
 import json
+import logging
 load_dotenv()
+logging.basicConfig(level=logging.INFO)
 
+# Setup
 ACCESS_TOKEN = os.getenv('GITHUB_ACCESS_TOKEN')
 OWNER = os.getenv('OWNER')
 REPO = os.getenv('REPO')
+storage_path = os.getenv('STORAGE_PATH') + '/workflow_runs.csv'
 
-workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN)
+# Get all runs
+workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN, 5)
+# Safety net
+with open(storage_path.replace('.csv', '.json'), 'w') as file:
+    json.dump(workflow_runs, file)
+# with open(storage_path.replace('.csv', '.json')) as file:
+#     workflow_runs = json.load(file)
 results = []
-# print(json.dumps(workflow_runs[0]))
+
+logging.info(len(workflow_runs))
+counter = 0
+
+# Format all runs
 for run in workflow_runs:
+    counter+=1
+    if counter % 100 == 0:
+        logging.info(f'Processed {counter} workflow runs so far')
+    
     if not run:
+        continue
+    
+    if not 'created_at' in run:
+        logging.warning('Run does not contain "created_at" field: %s', run)
         continue
     created_at = datetime.fromisoformat(run['created_at'][:-1])
     updated_at = datetime.fromisoformat(run['updated_at'][:-1])
@@ -41,5 +63,6 @@ for run in workflow_runs:
         'time_until_completed': time_until_completed
     })
 
+# Store
 df = pd.DataFrame(results)
-df.to_csv('workflow_runs.csv', index=False)
+df.to_csv(storage_path, index=False)
