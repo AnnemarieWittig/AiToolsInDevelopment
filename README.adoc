@@ -1,0 +1,70 @@
+= Extract Repository Data
+
+This repository stores scripts for data retrieval in GitHub repositories. They should be easily adjusted for other git-based repository managers.
+
+== Setup
+
+To run the scripts, they require a few **environment variables**, an **internet connection** to use the GitHub API, and a **locally cloned version of the repository**.
+
+The environment file (a `.env` file in root) requires the following information:
+
+- `GITHUB_ACCESS_TOKEN`: Access token to GitHub
+- `REPO_PATH`: Local path to the cloned repository to be analyzed 
+- `STORAGE_PATH`: Path where the script results are stored
+- `OWNER`: Owner of the repository
+- `REPO`: Name of the repository
+- `MAIN_BRANCH`: Primary branch of the analyzed repository
+
+If the used repository manager is a private instance of GitHub, some endpoints might need to be updated in the helper files.  
+These endpoints are in the link:/RepositoryCrawlers/helper/api_access.py[`api_access.py`] file, lines 17-24.
+
+== Analysis
+
+The scripts for analysis can be run without changes if GitHub is used in accordance with the setup. For other repository managers, the handling of responses might need to be adjusted due to different structures.
+
+Scripts for analyzing repositories and retrieving data:
+
+- link:/RepositoryCrawlers/generate_commit_data.py[`Commits`]
+  - Produces: `{STORAGE_PATH}/commits.csv`
+- link:/RepositoryCrawlers/generate_file_data.py[`Files per commit, specifically their changes`] _(MUST be run **after** commits, as it accesses the commits file)_
+  - Produces: `{STORAGE_PATH}/files.json`
+- link:/RepositoryCrawlers/generate_release_data.py[`Releases`]
+  - Produces: `{STORAGE_PATH}/releases.csv`
+- link:/RepositoryCrawlers/generate_issue_data.py[`Issues and issue data`]
+  - Produces: `{STORAGE_PATH}/issues.csv`
+  - The issue retrieval filters out bot-made changes. If a bot interacts with your repository, you can add their name to the list in line 19.
+- link:/RepositoryCrawlers/generate_branch_data.py[`Branches`]
+  - Produces: `{STORAGE_PATH}/branches.csv`
+- link:/RepositoryCrawlers/generate_build_data.py[`Builds`]
+  - Produces: `{STORAGE_PATH}/workflow_runs.csv`
+  - Intermediate file _(only as a safety net in case the processing of the workflows runs into errors)_: `{STORAGE_PATH}/workflow_runs.json`
+- link:/RepositoryCrawlers/generate_pull_request_data.py[`Pull requests`]
+  - Produces: `{STORAGE_PATH}/pull_requests.csv`
+  - Intermediate file _(only as a safety net in case the processing of the workflows runs into errors)_: `{STORAGE_PATH}/pull_requests.json`
+
+Primary scripts are located in `/RepositoryCrawlers`, while the functions interacting with the console and API are in `/RepositoryCrawlers/helpers`.  
+The produced files are the ones needed for analysis.
+
+It is recommended to run the scripts in the same order as listed here. However, aside from file dependencies, none of them are strictly required to be executed sequentially. Depending on the repository size, they may take some time to complete.
+
+== Data Considerations
+
+=== Workflows
+
+Several workflows might miss their triggering actor due to different reasons. These are usually shown through the event. An example of workflows and actors:
+
+[options="header",cols="2,1,1"]
+|===
+| Event (`run["event"]`) | Expected `triggering_actor`? | Possible Missing Actor?
+| `push` | pass:[&#10004;] User who pushed | pass:[&#10008;] If a bot pushed (e.g., `github-actions[bot]`)
+| `pull_request` | pass:[&#10004;] User who opened PR | pass:[&#10008;] If PR is from a **fork** with restricted permissions
+| `workflow_dispatch` | pass:[&#10004;] User who manually triggered | pass:[&#10008;] If triggered via API without a user
+| `repository_dispatch` | pass:[&#10008;] External system trigger | pass:[&#10004;] No actor (unless explicitly set in API request)
+| `schedule` | pass:[&#10008;] Cron job trigger | pass:[&#10004;] No actor (GitHub Actions runs it)
+| `workflow_run` | pass:[&#10008;] Triggered by another workflow | pass:[&#10004;] No actor (since it's automated)
+| `deployment` | pass:[&#10004;] User or bot initiating a deployment | pass:[&#10008;] If triggered by a bot
+| `release` | pass:[&#10004;] User who created release | pass:[&#10008;] If done by a bot
+| `issue_comment` | pass:[&#10004;] User who commented | pass:[&#10008;] If triggered via API without a user
+| `pull_request_review` | pass:[&#10004;] Reviewer | pass:[&#10008;] If triggered by automation
+| `merge_group` | pass:[&#10004;] User merging multiple PRs | pass:[&#10008;] If GitHub itself initiates merge
+|===
