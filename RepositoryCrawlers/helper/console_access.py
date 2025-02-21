@@ -769,7 +769,7 @@ def format_fast_forwarded_branch(branch):
             'merged' : 'fast-forwarded'
             }
         
-def retrieve_branch_data_new(repo_path = ".", main_branch="main"):
+def retrieve_branch_data_new(repo_path = ".", main_branch="main", path_to_environment = '.'):
     """
     Retrieve data for all branches in the repository.
 
@@ -799,7 +799,9 @@ def retrieve_branch_data_new(repo_path = ".", main_branch="main"):
     for branch_name in merged.splitlines():
         branch_name = clear_branch_name(branch_name)
         if validate_branch(branch_name):
-            merge_sha = run_console_command(["/Users/annemariewittig/Master/AiToolsInDevelopment/venv/bin/git-when-merged", "-c", branch_name], path=repo_path)
+            
+            merge_sha = run_console_command([f"{path_to_environment}/git-when-merged", "-c", branch_name], path=repo_path)
+            
             if merge_sha:
                 if "Commit is directly on this branch" in merge_sha:
                     branches.append(format_fast_forwarded_branch(branch_name))

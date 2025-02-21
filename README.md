@@ -11,6 +11,7 @@ The environment file (a `.env` file in root) requires the following information:
 - OWNER: Owner of the repository
 - REPO: Name of the repository
 - MAIN_BRANCH: Primary branch of the analysed repository
+- VIRTUAL_ENVIRONMENT_PATH: The path to your python environemnt's bin folder (the folder where installed packages are stored). This could, for example, be `./venv/bin`.
 
 If the used repository manager is a private instance of Github, some endpoints might need to be updated in the helper files.
 These endpoints are in the [api_access](/RepositoryCrawlers/helper/api_access.py) file, lines 17-24.

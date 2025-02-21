@@ -8,10 +8,11 @@ load_dotenv()
 # Setup
 REPO_PATH = os.getenv('REPO_PATH')
 MAIN_BRANCH = os.getenv('MAIN_BRANCH')
+VIRTUAL_ENVIRONMENT_PATH = os.getenv('VIRTUAL_ENVIRONMENT_PATH')
 storage_path = os.getenv('STORAGE_PATH') + '/branches.csv'
 
 # Retrieve Branches
-branches = retrieve_branch_data_new(REPO_PATH, MAIN_BRANCH)
+branches = retrieve_branch_data_new(REPO_PATH, MAIN_BRANCH, VIRTUAL_ENVIRONMENT_PATH)
 
 # Store
 df = pd.DataFrame(branches)
