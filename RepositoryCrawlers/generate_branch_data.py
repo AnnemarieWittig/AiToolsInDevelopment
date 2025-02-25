@@ -3,7 +3,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from helper.console_access import retrieve_branch_data_new
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Setup
 REPO_PATH = os.getenv('REPO_PATH')

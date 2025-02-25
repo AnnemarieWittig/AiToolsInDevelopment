@@ -14,7 +14,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-BASE_URL="https://api.github.com/repos/{owner}/{repo}/{ending}"
+# BASE_URL="https://api.github.com/repos/{owner}/{repo}/{ending}"
 URL_ENDING_PULLS = "pulls"
 URL_ENDING_ISSUES = "issues"
 URL_ENDING_COMMITS = "commits"
@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.INFO)
 
 import requests
 
-def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=True, max_retries=5, backoff_factor=2, max_pages=None):
+def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=True, max_retries=5, backoff_factor=2, endpoint=None, max_pages=None):
     """
     Retrieve data from a GitHub repository using the Github API.
 
@@ -51,7 +51,11 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
     :return: Retrieved data from the GitHub API.
     :rtype: list or dict
     """
-    url = BASE_URL.format(owner=owner, repo=repo, ending=ending)
+    if endpoint is None:
+        logging.error("Endpoint cannot be None.")
+        return None
+    
+    url = f'{endpoint}/{owner}/{repo}/{ending}'
 
     headers = {
         'Accept': 'application/vnd.github+json',
@@ -142,7 +146,7 @@ def grab_specific_commit(owner, repo, access_token, commit_sha):
     """
     return retrieve_via_url(owner, repo, access_token, f"{URL_ENDING_COMMITS}/{commit_sha}")
 
-def retrieve_workflow_runs(owner, repo, access_token, max_pages=None):
+def retrieve_workflow_runs(owner, repo, access_token, endpoint = None, max_pages=None):
     """
     Retrieve workflow runs from a GitHub repository.
 
@@ -156,7 +160,7 @@ def retrieve_workflow_runs(owner, repo, access_token, max_pages=None):
     :rtype: list
     """
     # Use the GitHub API to retrieve workflow runs
-    workflow_runs = retrieve_via_url(owner, repo, access_token, WORKLFOW_RUNS, {'per_page': 100}, paginate=True, max_pages=max_pages)
+    workflow_runs = retrieve_via_url(owner, repo, access_token, WORKLFOW_RUNS, {'per_page': 100}, paginate=True, max_pages=max_pages, endpoint=endpoint)
     runs = []
 
     for run in workflow_runs:
@@ -258,7 +262,7 @@ def retrieve_issue_timeline(owner, repo, access_token, issue_number):
     timeline = retrieve_via_url(owner, repo, access_token, ISSUE_TIMELINE.format(issue_number=issue_number), paginate=True)
     return timeline
 
-def retrieve_pull_request_details(owner, repo, access_token, pr_number):
+def retrieve_pull_request_details(owner, repo, access_token, pr_number, endpoint):
     """
     Retrieve details of a specific pull request from a GitHub repository.
 
@@ -273,10 +277,10 @@ def retrieve_pull_request_details(owner, repo, access_token, pr_number):
     :return: Details of the specified pull request.
     :rtype: dict
     """
-    pull_details = retrieve_via_url(owner, repo, access_token, f"{URL_ENDING_PULLS}/{pr_number}")
+    pull_details = retrieve_via_url(owner, repo, access_token, f"{URL_ENDING_PULLS}/{pr_number}", endpoint=endpoint)
     return pull_details
 
-def retrieve_issues_parallel(owner, repo, access_token):
+def retrieve_issues_parallel(owner, repo, access_token, endpoint):
     """
     Parallel retrieval of issues using concurrent.futures.
     Fetches the first page to determine the total number of pages from the 'Link' header,
@@ -294,7 +298,7 @@ def retrieve_issues_parallel(owner, repo, access_token):
     Example usage:
         >>> issues = retrieve_issues_parallel("octocat", "Hello-World", "ghp_12345abc...")
     """
-    base_url=BASE_URL.format(owner=owner, repo=repo, ending=URL_ENDING_ISSUES)
+    base_url=f'{endpoint}/{owner}/{repo}/{URL_ENDING_ISSUES}'
     # base_url = f"https://api.github.com/repos/{owner}/{repo}/issues"
     headers = {
         'Accept': 'application/vnd.github+json',

@@ -4,7 +4,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from helper.console_access import substract_and_format_time, retrieve_releases
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Setup
 REPO_PATH = os.getenv('REPO_PATH')

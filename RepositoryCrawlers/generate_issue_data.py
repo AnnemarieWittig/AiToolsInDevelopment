@@ -3,13 +3,11 @@ from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
 from helper.console_access import substract_and_format_time
-from helper.api_access import retrieve_oldest_comments_parallel, retrieve_issues_parallel
-import json
-import concurrent.futures
+from helper.api_access import retrieve_issues_parallel
 import logging
-load_dotenv()
+load_dotenv(override=True)
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
 # Setup
 ACCESS_TOKEN = os.getenv('GITHUB_ACCESS_TOKEN')
@@ -18,9 +16,10 @@ REPO = os.getenv('REPO')
 # Adjust to needs of the repository
 BOT_USERS = ['dependabot-preview[bot]', 'dependabot[bot]', 'renovate[bot]']
 STORAGE_PATH = os.getenv('STORAGE_PATH')
+ENDPOINT = os.getenv('ENDPOINT')
 
 # Retrieve Issues
-issues = retrieve_issues_parallel(OWNER, REPO, ACCESS_TOKEN)
+issues = retrieve_issues_parallel(OWNER, REPO, ACCESS_TOKEN, ENDPOINT)
 
 results = []
 counter = 0

@@ -2,13 +2,13 @@ import os, json
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.console_access import run_git_command, substract_and_format_time, retrieve_pull_requests_parallel
+from helper.console_access import run_git_command, substract_and_format_time, transform_time, retrieve_pull_requests_parallel
 from helper.api_access import retrieve_pull_request_details
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Setup
 ACCESS_TOKEN = os.getenv('GITHUB_ACCESS_TOKEN')
@@ -16,6 +16,7 @@ OWNER = os.getenv('OWNER')
 REPO = os.getenv('REPO') 
 REPO_PATH = os.getenv('REPO_PATH')
 BOT_USERS = ['dependabot-preview[bot]', 'dependabot[bot]', 'renovate[bot]']
+ENDPOINT = os.getenv('ENDPOINT')
 storage_path = os.getenv('STORAGE_PATH') + '/pull_requests.json'
 
 def calculate_till_first_comment(pr_number, created_at, repo_path, skip_comments_from_author=True):
@@ -41,25 +42,30 @@ def calculate_till_first_comment(pr_number, created_at, repo_path, skip_comments
         return time_to_first_comment
     else:
         return None
-    
+
 # Retrieve Pull Request
 pull_requests = retrieve_pull_requests_parallel(REPO_PATH, 1)
 
 logging.info(f'found {len(pull_requests)} pull requests')
 # Safety Storage
-with open(storage_path, 'w') as file:
-    json.dump(pull_requests, file)
+# with open(storage_path, 'w') as file:
+#     json.dump(pull_requests, file)
 results = []
 
 for pull_request in pull_requests:
-    created_at = datetime.fromisoformat(pull_request['created_at'])
+    created_at = transform_time(pull_request['created_at'])
     
     # Retrieve additional details from the GitHub API TODO remove here if no api
-    pr_details = retrieve_pull_request_details(OWNER, REPO, ACCESS_TOKEN, pull_request['number'])
+    pr_details = retrieve_pull_request_details(OWNER, REPO, ACCESS_TOKEN, pull_request['number'], ENDPOINT)
     with open('pull_requests.json', 'w') as file:
         json.dump(pr_details, file)
     
-    author = pr_details['user']['login']
+    if not pr_details:
+        continue
+    elif isinstance(pr_details, list) and len(pr_details) == 1:
+        pr_details = pr_details[0]
+    
+    author = pr_details['user']['login'] if pr_details['user'] else None
     merger = pr_details['merged_by']['login'] if pr_details['merged_by'] else None
     merged_at = pr_details['merged_at'] if pr_details['merged_at'] else None
     state = pr_details['state']
@@ -77,13 +83,13 @@ for pull_request in pull_requests:
     # Calculate time until closed and merged
     time_until_closed = None
     if closed_at:
-        start = datetime.fromisoformat(created_at)
-        closed_at = datetime.fromisoformat(closed_at)
+        start = transform_time(created_at)
+        closed_at = transform_time(closed_at)
         time_until_closed = substract_and_format_time(start, closed_at)
         
     if merged_at:
-        start = datetime.fromisoformat(created_at)
-        merged_at = datetime.fromisoformat(merged_at)
+        start = transform_time(created_at)
+        merged_at = transform_time(merged_at)
         time_until_merged = substract_and_format_time(start, merged_at)
         
     pr_selection = {

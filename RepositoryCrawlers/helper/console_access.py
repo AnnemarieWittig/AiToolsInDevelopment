@@ -7,13 +7,24 @@ import sys
 
 # Configure logging (file or console; adjust as needed)
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 ########################## Generals
 """
 General utility functions for time calculation and running console commands.
 """
+    
+def transform_time(timestr):
+    try: 
+        return datetime.fromisoformat(timestr)
+    except ValueError as e:
+        try:
+            return datetime.strptime(timestr, '%a %b %d %H:%M:%S %Y %z')
+        except:
+            logging.error(f'no valid datetimeformat {timestr}')
+    
+    return timestr
 
 def substract_and_format_time(start, end):
     """
@@ -29,6 +40,9 @@ def substract_and_format_time(start, end):
     :return: The formatted time difference.
     :rtype: str
     """
+    if not isinstance(start, datetime) or not isinstance(end, datetime):
+        return 'n/a'
+    
     time_diff = end - start
     days = time_diff.days
     hours, remainder = divmod(time_diff.seconds, 3600)
@@ -769,6 +783,7 @@ def format_fast_forwarded_branch(branch):
             'merged' : 'fast-forwarded'
             }
         
+import os
 def retrieve_branch_data_new(repo_path = ".", main_branch="main", path_to_environment = '.'):
     """
     Retrieve data for all branches in the repository.
@@ -783,11 +798,15 @@ def retrieve_branch_data_new(repo_path = ".", main_branch="main", path_to_enviro
     :return: A list of dictionaries containing branch information.
     :rtype: list
     """
+    git_when_merged_path = f"{path_to_environment}/git-when-merged"
     branch_args = ["branch", "--all", "--no-merged"]
     unmerged = run_git_command(branch_args, None, repo_path)
+    
+    unmerged_split = unmerged.splitlines()
+    logging.info(f"Retrieved {len(unmerged_split)} unmerged branches.")
     branches = []
     
-    for branch_name in unmerged.splitlines():
+    for branch_name in unmerged_split:
         branch_name = branch_name.split(' -> ')[-1].strip()
         if validate_branch(branch_name):
             unmerged_args = ["show", "--summary", branch_name, "--pretty=format:%H'%ad'%an", "--date=iso-strict", "--no-patch", "^main"]
@@ -795,8 +814,10 @@ def retrieve_branch_data_new(repo_path = ".", main_branch="main", path_to_enviro
     
     branch_args = ["branch", "--all", "--merged"]
     merged = run_git_command(branch_args, None, repo_path)
+    merged_split = merged.splitlines()
+    logging.info(f"Retrieved {len(merged_split)} unmerged branches.")
     
-    for branch_name in merged.splitlines():
+    for branch_name in merged_split:
         branch_name = clear_branch_name(branch_name)
         if validate_branch(branch_name):
             

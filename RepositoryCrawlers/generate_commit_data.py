@@ -3,12 +3,9 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(override=True)
 
 REPO_PATH = os.getenv('REPO_PATH')
-OWNER=os.getenv('OWNER')
-REPO=os.getenv('REPO')
-ACCESS_TOKEN=os.getenv('GITHUB_ACCESS_TOKEN')
 STORAGE_PATH = os.getenv('STORAGE_PATH')
 store_path = STORAGE_PATH + "/commits.csv"
 

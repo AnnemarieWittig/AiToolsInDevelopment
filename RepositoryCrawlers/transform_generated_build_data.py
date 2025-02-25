@@ -2,33 +2,27 @@ import os
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.api_access import retrieve_workflow_runs
 from helper.console_access import substract_and_format_time
-import json
+import ijson
 import logging
-load_dotenv(override=True)
+import json
+
+load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 # Setup
 ACCESS_TOKEN = os.getenv('GITHUB_ACCESS_TOKEN')
 OWNER = os.getenv('OWNER')
 REPO = os.getenv('REPO')
-ENDPOINT = os.getenv('ENDPOINT')
 storage_path = os.getenv('STORAGE_PATH') + '/workflow_runs.csv'
 
-# Get all runs
-workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN, endpoint= ENDPOINT)
-# Safety net
-# with open(storage_path.replace('.csv', '.json'), 'w') as file:
-#     json.dump(workflow_runs, file)
-# with open(storage_path.replace('.csv', '.json')) as file:
-#     workflow_runs = json.load(file)
+json_file_path = storage_path.replace('.csv', '.json')
+
 results = []
-
-logging.info(len(workflow_runs))
 counter = 0
+missings = []
 
-def get_run_values(run):
+def check_value_presence(run):
     missing_keys = []
     
     def get_value(key, default="N/A"):
@@ -63,6 +57,7 @@ def get_run_values(run):
     # Log any missing values
     if missing_keys:
         logging.warning(f"Missing keys in run {run_id}: {', '.join(missing_keys)}")
+        missings.append(run)
     
     # Compute time_until_completed safely
     time_until_completed = "N/A"
@@ -90,22 +85,27 @@ def get_run_values(run):
         "time_until_completed": time_until_completed,
     }
 
-# Format all runs
-for run in workflow_runs:
-    counter+=1
-    if counter % 100 == 0:
-        logging.info(f'Processed {counter} workflow runs so far')
-    
-    if not run:
-        continue
-    
-    if not 'created_at' in run:
-        logging.warning('Run does not contain "created_at" field: %s', run)
-        continue
+with open(json_file_path, "r", encoding="utf-8") as file:
+    parser = ijson.items(file, "item")  # Stream each top-level item (assuming a list of runs)
+    for run in parser:
+        counter += 1
+        if counter % 1000 == 0:
+            logging.info(f'Processed {counter} workflow runs so far')
+        
+        if not run:
+            continue
+        
+        if "created_at" not in run:
+            logging.warning('Run does not contain "created_at" field: %s', run)
+            continue
+        
+        # Add information to results
+        results.append(check_value_presence(run))
 
-    # Add information to results
-    results.append(get_run_values(run))
-
-# Store
+# Store in CSV
+logging.info(f'Total processed workflow runs: {counter}')
 df = pd.DataFrame(results)
 df.to_csv(storage_path, index=False)
+
+with open(storage_path.replace(".csv", "_missing_values.json"), "w") as f:
+    json.dump(missings, f)
