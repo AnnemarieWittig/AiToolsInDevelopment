@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.console_access import substract_and_format_time, transform_time
+from helper.general_purpose import substract_and_format_time, transform_time
 from helper.api_access import retrieve_issues_parallel
 import logging
 load_dotenv(override=True)

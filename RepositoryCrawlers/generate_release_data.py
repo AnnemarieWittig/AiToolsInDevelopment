@@ -2,7 +2,8 @@ import os
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.console_access import substract_and_format_time, retrieve_releases
+from helper.git_console_access import retrieve_releases
+from helper.general_purpose import substract_and_format_time
 
 load_dotenv(override=True)
 

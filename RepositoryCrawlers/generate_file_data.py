@@ -1,4 +1,4 @@
-from helper.console_access import retrieve_commit_file_changes, retrieve_file_content
+from helper.git_console_access import retrieve_commit_file_changes, retrieve_file_content
 import pandas as pd
 import json
 import os

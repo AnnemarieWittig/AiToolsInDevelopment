@@ -2,7 +2,8 @@ import os, json
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.console_access import run_git_command, substract_and_format_time, transform_time, retrieve_pull_requests_parallel
+from helper.git_console_access import run_git_command, retrieve_pull_requests_parallel
+from helper.general_purpose import substract_and_format_time, transform_time
 from helper.api_access import retrieve_pull_request_details, retrieve_pull_requests_gitlab
 import logging
 
@@ -90,8 +91,8 @@ else:
 
 logging.info(f'found {len(pull_requests)} pull requests')
 # Safety Storage
-with open(storage_path, 'w') as file:
-    json.dump(pull_requests, file)
+# with open(storage_path, 'w') as file:
+#     json.dump(pull_requests, file)
 results = []
 
 for pull_request in pull_requests:

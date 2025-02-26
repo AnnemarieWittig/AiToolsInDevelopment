@@ -11,96 +11,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
-########################## Generals
-"""
-General utility functions for time calculation and running console commands.
-"""
-    
-def transform_time(timestr):
-    """
-    Transform a time string into a datetime object.
-
-    This function attempts to parse a given time string into a datetime object using multiple common formats.
-    If the string does not match any of the specified formats, it logs an error message.
-
-    Supported formats:
-    - ISO 8601: '%Y-%m-%dT%H:%M:%S.%f%z'
-    - ISO 8601 without microseconds: '%Y-%m-%dT%H:%M:%S%z'
-    - RFC 2822: '%a, %d %b %Y %H:%M:%S %z'
-    - Custom formats:
-        - '%a %b %d %H:%M:%S %Y %z'
-        - '%Y-%m-%d %H:%M:%S'
-        - '%Y-%m-%d %H:%M:%S.%f'
-        - '%d/%m/%Y %H:%M:%S'
-        - '%d-%m-%Y %H:%M:%S'
-        - '%Y-%m-%dT%H:%M:%S.%f%z'
-        - '%Y-%m-%dT%H:%M:%S.%f%z'
-        - '%Y-%m-%dT%H:%M:%S.%f%z'
-        - '%Y-%m-%dT%H:%M:%S.%f%z'
-
-    :param timestr: The time string to be transformed.
-    :type timestr: str
-    :return: The corresponding datetime object if the format is recognized, otherwise the original string.
-    :rtype: datetime or str
-    """
-    if timestr.lower() == "n/a":
-        return timestr
-
-    # Fix non-standard timezones (e.g., +01:0 → +01:00)
-    timestr = re.sub(r'([+-]\d{2}):(\d{1})$', r'\1:0\2', timestr)  # Converts +01:0 to +01:00
-
-    # Try fromisoformat first (handles many ISO 8601 formats)
-    try:
-        return datetime.fromisoformat(timestr)
-    except ValueError:
-        pass
-
-    # Define common datetime formats
-    formats = [
-        '%Y-%m-%dT%H:%M:%S.%f%z',
-        '%Y-%m-%dT%H:%M:%S%z',
-        '%Y-%m-%d %H:%M:%S',
-        '%Y-%m-%d %H:%M:%S.%f',
-        '%d/%m/%Y %H:%M:%S',
-        '%d-%m-%Y %H:%M:%S',
-        '%a, %d %b %Y %H:%M:%S %z',
-        '%a %b %d %H:%M:%S %Y %z'
-    ]
-
-    # Try parsing with each format
-    for fmt in formats:
-        try:
-            return datetime.strptime(timestr, fmt)
-        except ValueError:
-            continue
-
-    logging.error(f'No valid datetime format found for "{timestr}"')
-    return timestr
-
-def substract_and_format_time(start, end):
-    """
-    Calculate the difference between two datetime objects and format it as a string.
-
-    This function calculates the time difference between two datetime objects and formats it as a string in the format "DD:HH:MM:SS".
-
-    :param start: The start time.
-    :type start: datetime
-    :param end: The end time.
-    :type end: datetime
-
-    :return: The formatted time difference.
-    :rtype: str
-    """
-    if not isinstance(start, datetime) or not isinstance(end, datetime):
-        return 'n/a'
-    
-    time_diff = end - start
-    days = time_diff.days
-    hours, remainder = divmod(time_diff.seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-
-    formatted_time = f"{days:02}:{hours:02}:{minutes:02}:{seconds:02}"
-    return formatted_time
 
 def run_git_command(args, cwd=None, repo_path=None):
     """
@@ -140,6 +50,10 @@ def run_git_command(args, cwd=None, repo_path=None):
         except UnicodeDecodeError:
             return result.stdout.decode('latin-1').strip()
     except subprocess.CalledProcessError as e:
+        if 'does not exist in' in str(e.stderr):
+            logging.debug(f"Error running command: {' '.join(e.cmd)}")
+            logging.debug(e.stderr)
+            return None
         logging.error(f"Error running command: {' '.join(e.cmd)}")
         logging.error(e.stderr)
         return None
@@ -176,6 +90,10 @@ def run_console_command(args, path = '.'):
     except subprocess.CalledProcessError as e:
         if "Commit is directly on this branch" in str(e.stderr):
             return str(e.stderr)
+        elif "git-when-merged" in ' '.join(e.cmd):
+            logging.debug(f"Issue when checking time until branch was merged using  command: {' '.join(e.cmd)}")
+            logging.debug(e.stderr)
+            return None
         logging.error(f"Error running command: {' '.join(e.cmd)}")
         logging.error(e.stderr)
         return None
@@ -207,13 +125,13 @@ def retrieve_commits(repo_path="."):
     total_count_cmd = ["rev-list", "--all", "--count"]
     total_count_output = run_git_command(total_count_cmd, cwd=repo_path)
     if not total_count_output:
-        logging.warning("Could not determine total commit count.")
+        logging.debug("Could not determine total commit count.")
         return []
     
     try:
         total_commits = int(total_count_output)
     except ValueError:
-        logging.warning("Total commit count is not a valid integer.")
+        logging.debug("Total commit count is not a valid integer.")
         return []
 
     logging.info(f"Total commits in repo: {total_commits}")
@@ -228,7 +146,7 @@ def retrieve_commits(repo_path="."):
     ]
     output = run_git_command(rev_list_cmd, cwd=repo_path)
     if not output:
-        logging.warning("No commit data returned.")
+        logging.debug("No commit data returned.")
         return []
 
     lines = output.splitlines()
@@ -576,7 +494,7 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
         total_commits = 0
 
     if total_commits == 0:
-        logging.warning("No commits found in repository.")
+        logging.debug("No commits found in repository.")
         return []
 
     logging.info(f"Total commits: {total_commits}")
@@ -657,7 +575,7 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
 
     # Optional: Cross-check final count
     if processed != total_commits:
-        logging.warning(f"Expected {total_commits} commits but only parsed {processed}")
+        logging.debug(f"Expected {total_commits} commits but only parsed {processed}")
 
     return detailed_commits
 
@@ -737,7 +655,7 @@ def grab_branch_name (ref):
         return ref.split(" -> ", 1)[-1]
     else:
         if ref != "main":
-            logging.warning(f"Unhandled reference format: {ref}")
+            logging.debug(f"Unhandled reference format: {ref}")
         return ref.split("/", 2)[-1]
     
 def validate_branch(branch_name):
@@ -789,7 +707,7 @@ def retrieve_branch_information(branch_name, retrieval_arguments, repo_path, mer
         for commit in commits_on_branch.splitlines():
             commit_args = commit.split("'")
             if len(commit_args) < 3:
-                logging.warning(f"Unvalid commit output for branch {branch_name} {commit}")
+                logging.debug(f"Unvalid commit output for branch {branch_name} {commit}")
                 continue    
             
             commits.append(commit_args[0])
@@ -807,6 +725,17 @@ def retrieve_branch_information(branch_name, retrieval_arguments, repo_path, mer
             'last_active' : last_commit['commit_time'],
             'last_commit_sha' : last_commit['commit_hash'],
             'last_author' : last_commit['author'],
+            'merged' : merged
+            }
+    return  {
+            'branch_name': branch_name,
+            'commits' : commits,
+            'created_at' : None,
+            'created_by' : None,
+            'first_commit_sha' : None,
+            'last_active' : None,
+            'last_commit_sha' : None,
+            'last_author' : None,
             'merged' : merged
             }
         
@@ -849,7 +778,6 @@ def retrieve_branch_data_new(repo_path = ".", main_branch="main", path_to_enviro
     :return: A list of dictionaries containing branch information.
     :rtype: list
     """
-    git_when_merged_path = f"{path_to_environment}/git-when-merged"
     branch_args = ["branch", "--all", "--no-merged"]
     unmerged = run_git_command(branch_args, None, repo_path)
     
@@ -881,7 +809,7 @@ def retrieve_branch_data_new(repo_path = ".", main_branch="main", path_to_enviro
                     merged_args = ["log", f"{merge_sha}^-",  "--pretty=format:%H'%ad'%an", "--date=iso-strict"]
                     branches.append(retrieve_branch_information(branch_name, merged_args,repo_path=repo_path, merged=True))
             else:
-                logging.warning(f"No merge sha for merged branch {branch_name}")
+                logging.debug(f"No merge sha for merged branch {branch_name}")
     
     main_args = ["log", "main", "--all", "--pretty=format:%H'%ad'%an", "--date=iso-strict"]
     branches.append(retrieve_branch_information(main_branch, main_args, repo_path=repo_path, merged=True))
@@ -1229,6 +1157,9 @@ def retrieve_pull_requests(repo_path):
 Functions for retrieving build and release data (using tags) from a local Git repository
 """
 
+def get_tag_info_for_unusal_layouts(tag_output):
+    tag_output.split
+
 def retrieve_releases(repo_path):
     """
     Retrieve release information from the repository.
@@ -1241,7 +1172,9 @@ def retrieve_releases(repo_path):
     :return: A list of dictionaries containing release information.
     :rtype: list
     """
-    # Get all tags (assuming tags are used for releases)
+    fetch_args = ["fetch", "--tags"]
+    run_git_command(fetch_args, repo_path=repo_path)
+
     tags_args = ["tag"]
     tags_output = run_git_command(tags_args, repo_path=repo_path)
 
@@ -1251,23 +1184,26 @@ def retrieve_releases(repo_path):
             # Get details for each tag
             tag_details_args = ["show", "--pretty=format:%H|%an|%ad|%s", "--date=iso-strict", tag]
             tag_details_output = run_git_command(tag_details_args, repo_path=repo_path)
-
+            
             if tag_details_output:
-                tag_info = tag_details_output.splitlines()[0].split("|")
-                if len(tag_info) < 4:
-                    continue
-                commit_sha = tag_info[0].strip()
-                author = tag_info[1].strip()
-                date = tag_info[2].strip()
-                message = tag_info[3].strip()
+                tag_information = tag_details_output.splitlines()
+                for line in tag_information:
+                    tag_info=line.split("|")
+                    if len(tag_info) < 4:
+                        continue
+                    commit_sha = tag_info[0].strip()
+                    author = tag_info[1].strip()
+                    date = tag_info[2].strip()
+                    message = tag_info[3].strip()
 
-                releases.append({
-                    'tag': tag,
-                    'sha': commit_sha,
-                    'author': author,
-                    'date': date,
-                    'message': message
-                })
+                    releases.append({
+                        'tag': tag,
+                        'sha': commit_sha,
+                        'author': author,
+                        'date': date,
+                        'message': message
+                    })
+                    break
     return releases
 
 def retrieve_builds(repo_path):
@@ -1325,7 +1261,7 @@ def retrieve_pr_metadata_bulk(repo_path):
     pr_metadata = []
 
     for line in pr_refs_output.splitlines():
-        # logging.warning("\'" + line + "\'")
+        # logging.debug("\'" + line + "\'")
         parts = line.split("|", 4)
         
         if len(parts) < 5:

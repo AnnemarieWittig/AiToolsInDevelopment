@@ -33,21 +33,43 @@ It is recommended to run the scripts in the same order as listed here. However, 
 
 == Setup for automatic activation of scripts
 
-=== Preparation
-To automatically 
+1.  To automatically generate the information of multiple repositories, the repositories and their details must be added to the `file_list.csv`.
+
+  The file list is a table and has the structure:
+  |===
+  | ACCESS_TOKEN | REPO_PATH | STORAGE_PATH | OWNER | REPO | MAIN_BRANCH | ENDPOINT | MODE | VIRTUAL_ENVIRONMENT_PATH
+  |===
+
+  Example inputs can be found in the current link:./file_list.csv[file_list.csv], explanations for each value can be found in the following chapter, <<Environment-Values>>. *It is important that the file list always ends with an empty line*, to ensure the script can read everything correctly.
+
+2.  Once done, the script has to be started from the root of this repository using the following command:
+  [source,bash]
+  ----
+  bash ./run_multiple.sh
+  ----
+
+*What happens?*
+1. The script automatically creates a python environment and installs the necessary requirements at `current-directory/venv`.
+2. At your chosen storage directory, a folder named after the current repository will be added. *Repositories cannot have the same name and same storage folder.*
+3. The generated files are stored to that directory.
+
+== Environment Values
+The scripts expect the following environment values:
+
+- `ACCESS_TOKEN`: Access token to GitHub
+- `REPO_PATH`: Local path to the cloned repository to be analyzed 
+- `STORAGE_PATH`: Path where the script results are stored
+- `OWNER`: For Github: Owner of the repository, for Gitlab: Project ID
+- `REPO`: Name of the repository
+- `MAIN_BRANCH`: Primary branch of the analyzed repository, usually is `main`, but might differ
+- `ENDPOINT`: The endpoint of the instance where the repository is stored. For example, for GitHub it is `https://api.github.com`
+- `MODE`: The mode determines, which repository manager is used and how the data is retrieved. Currently supported modes: `github` and `gitlab` - no other input is accepted.
 
 == Setup for manual activation of scripts
 
 To run the scripts, they require a few **environment variables**, an **internet connection** to use the GitHub API, and a **locally cloned version of the repository**.
 
-The environment file (a `.env` file in root) requires the following information:
-
-- `ACCESS_TOKEN`: Access token to GitHub
-- `REPO_PATH`: Local path to the cloned repository to be analyzed 
-- `STORAGE_PATH`: Path where the script results are stored
-- `OWNER`: Owner of the repository
-- `REPO`: Name of the repository
-- `MAIN_BRANCH`: Primary branch of the analyzed repository
+The environment file (a `.env` file in root) requires the following information described in the previous chapter. Additionally, it requires another environment variable `VIRTUAL_ENVIRONMENT_PATH` with the full path to the used python environment.
 
 If the used repository manager is a private instance of GitHub, some endpoints might need to be updated in the helper files.  
 These endpoints are in the link:/RepositoryCrawlers/helper/api_access.py[`api_access.py`] file, lines 17-24.

@@ -1,4 +1,4 @@
-from helper.console_access import retrieve_all_commits_with_stats_and_logging
+from helper.git_console_access import retrieve_all_commits_with_stats_and_logging
 import pandas as pd
 from dotenv import load_dotenv
 import os

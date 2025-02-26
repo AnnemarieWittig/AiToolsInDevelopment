@@ -2,13 +2,13 @@ import os
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.console_access import substract_and_format_time
+from helper.git_console_access import substract_and_format_time
 import ijson
 import logging
 import json
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
 # Setup
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
@@ -56,7 +56,7 @@ def check_value_presence(run):
 
     # Log any missing values
     if missing_keys:
-        logging.warning(f"Missing keys in run {run_id}: {', '.join(missing_keys)}")
+        logging.debug(f"Missing keys in run {run_id}: {', '.join(missing_keys)}")
         missings.append(run)
     
     # Compute time_until_completed safely
@@ -96,7 +96,7 @@ with open(json_file_path, "r", encoding="utf-8") as file:
             continue
         
         if "created_at" not in run:
-            logging.warning('Run does not contain "created_at" field: %s', run)
+            logging.debug('Run does not contain "created_at" field: %s', run)
             continue
         
         # Add information to results

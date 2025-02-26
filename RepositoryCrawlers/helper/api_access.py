@@ -26,7 +26,7 @@ WORKFLOW_RUNS_GITLAB="/pipelines"
 
 MAX_WORKFLOW_RUNS = 10000
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 
 import requests
 
@@ -58,7 +58,7 @@ def extract_github_pagination(response):
             try:
                 total_pages = int(last_link.split('page=')[-1].split('&')[0])
             except ValueError:
-                logging.warning(f"Failed to parse total pages from last_link: {last_link}")
+                logging.debug(f"Failed to parse total pages from last_link: {last_link}")
     # logging.error(next_link)
     # logging.error(total_pages)
     return next_link, total_pages
@@ -69,25 +69,31 @@ def extract_gitlab_pagination(response):
     total_pages = response.headers.get('X-Total-Pages')
     return next_page, total_pages
 
-def construct_header(mode, token):
-    if mode == 'github':
+def get_gitlab_header(token):
+    return {
+            'Accept': 'application/json', 
+            'Authorization': f'Bearer {token}' 
+        }
+    
+def get_github_header(token):
         return {
             'Accept': 'application/vnd.github+json',
             'Authorization': f'Bearer {token}',
             'X-GitHub-Api-Version': '2022-11-28'
         }
+
+def construct_header(mode, token):
+    if mode == 'github':
+        return get_github_header(token)
     elif mode == 'gitlab':
-        return {
-            'Accept': 'application/json', 
-            'Authorization': f'Bearer {token}' 
-        }
+        return get_gitlab_header(token)
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
 def construct_url(mode, endpoint, owner, repo, ending, next_page=None):
     """Constructs the appropriate URL based on the mode (GitHub/GitLab)."""
     if mode == 'github':
-        return f'{endpoint}/{owner}/{repo}/{ending}'
+        return f'{endpoint}/repos/{owner}/{repo}/{ending}'
     elif mode == 'gitlab':
         base_url = f'{endpoint}/api/v4/projects/{owner}/{ending}'
         return f'{base_url}?page={next_page}&per_page=100' if next_page else base_url
@@ -104,7 +110,7 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
 
     url = construct_url(mode, endpoint, owner, repo, ending)
     headers = construct_header(mode, access_token)
-    parameters.setdefault('per_page', 5)
+    parameters.setdefault('per_page', 100)
     
     all_results = []
     current_page = 1
@@ -115,13 +121,12 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
             for attempt in range(max_retries):
                 try:
                     response = requests.get(url, headers=headers, params=parameters)
-                    logging.info(f"Fetching {url} with parameters: {parameters}")
                     response.raise_for_status()
                     break
                 except requests.exceptions.RequestException as e:
                     if response.status_code in {502, 503, 504}:
                         wait_time = backoff_factor * (2 ** attempt)
-                        logging.warning(f"Error {response.status_code}. Retrying in {wait_time} seconds...")
+                        logging.debug(f"Error {response.status_code}. Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                     else:
                         logging.error(f"Request failed: {e}")
@@ -150,7 +155,7 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
                 return all_results
 
         except KeyboardInterrupt:
-            logging.warning("Process interrupted by user. Saving results to 'partial_results.json'.")
+            logging.debug("Process interrupted by user. Saving results to 'partial_results.json'.")
             with open('partial_results.json', 'w') as f:
                 json.dump(all_results, f, indent=4)
             raise
@@ -331,79 +336,62 @@ def retrieve_pull_request_details(owner, repo, access_token, pr_number, endpoint
 def retrieve_issues_parallel(owner, repo, access_token, endpoint, mode):
     """
     Parallel retrieval of issues using concurrent.futures.
-    Fetches the first page to determine the total number of pages from the 'Link' header,
+    Fetches the first page to determine the total number of pages using pagination headers,
     then issues parallel requests for all remaining pages.
 
-    :param owner: The GitHub repository owner name.
-    :type owner: str
-    :param repo: The GitHub repository name.
-    :type repo: str
-    :param access_token: A personal access token (classic) with permissions to read issues.
-    :type access_token: str
+    :param owner: The GitHub or GitLab repository owner name.
+    :param repo: The GitHub repository name (GitLab uses project ID).
+    :param access_token: A personal access token with permission to read issues.
+    :param endpoint: API base URL.
     :param mode: Specifies whether to retrieve from "github" or "gitlab".
-    :type mode: str
     
     :return: A list of all issues from the repository.
-    :rtype: list
-
-    Example usage:
-        >>> issues = retrieve_issues_parallel("octocat", "Hello-World", "ghp_12345abc...")
     """
-    
+
+    # Determine API URL and headers based on mode
     if mode == "github":
-        base_url=f'{endpoint}/{owner}/{repo}/{URL_ENDING_ISSUES}'
-        # base_url = f"https://api.github.com/repos/{owner}/{repo}/issues"
+        base_url = f'{endpoint}/repos/{owner}/{repo}/{URL_ENDING_ISSUES}'
         headers = get_github_header(access_token)
-    
-    if mode == "gitlab":
+    elif mode == "gitlab":
         base_url = f'{endpoint}/api/v4/projects/{owner}/{URL_ENDING_ISSUES}'
-        # f"https://git.informatik.uni-leipzig.de/api/v4/projects/{project_id}/issues"
         headers = get_gitlab_header(access_token)
-        
+    else:
+        raise ValueError("Unsupported mode. Choose 'github' or 'gitlab'.")
+
     params = {
         'state': 'all',
-        'per_page': 100
+        'per_page': 100  # Max per page
     }
 
     logging.info(f"Starting parallel issue retrieval for repository: {owner}/{repo}")
 
-    # 1) Fetch the first page to get total count of pages from 'Link' header
+    # 1) Fetch the first page to get pagination details
     logging.info("Requesting the first page...")
     response = requests.get(base_url, headers=headers, params=params)
     response.raise_for_status()
     first_page_data = response.json()
 
-    link_header = response.headers.get('Link', '')
-    if not link_header:
-        # No Link header indicates either a single page or no pagination needed
-        logging.info("Only one page of issues returned. No pagination detected.")
-        return first_page_data
-
-    # 2) Parse 'Link' header to find the last page
-    total_pages = None
-    for link in link_header.split(','):
-        if 'rel="last"' in link:
-            last_link = link[link.find('<') + 1:link.find('>')]
-            # Extract &page=N from the URL
-            page_number_str = last_link.split('page=')[-1].split('&')[0]
-            total_pages = int(page_number_str)
-            break
+    # Use pagination function to extract next page & total pages
+    next_page, total_pages = get_pagination_headers(response, mode)
 
     if not total_pages:
-        logging.info("Could not determine the last page from the Link header. Returning first page.")
+        logging.info("Only one page of issues returned. No pagination detected.")
         return first_page_data
 
     logging.info(f"Total pages determined: {total_pages}")
 
-    all_issues = []
-    all_issues.extend(first_page_data)
-    current_page = 1
-    logging.info(f"Page {current_page}/{total_pages} fetched. Issues so far: {len(all_issues)}")
+    all_issues = first_page_data.copy()
+    logging.info(f"Page 1/{total_pages} fetched. Issues so far: {len(all_issues)}")
 
-    # 3) Function to fetch an individual page
+    # 2) Function to fetch an individual page
     def fetch_page(page_number):
+        """Fetch issues from a specific page."""
         page_params = params.copy()
-        page_params['page'] = page_number
+        if mode == "github":
+            page_params['page'] = page_number
+        elif mode == "gitlab":
+            page_params['page'] = page_number
+
         logging.debug(f"Fetching page {page_number}/{total_pages} ...")
         r = requests.get(base_url, headers=headers, params=page_params)
         r.raise_for_status()
@@ -411,12 +399,11 @@ def retrieve_issues_parallel(owner, repo, access_token, endpoint, mode):
         logging.debug(f"Finished fetching page {page_number}/{total_pages}. Items: {len(data)}")
         return data
 
-    # 4) Fetch pages 2..total_pages in parallel
+    # 3) Fetch remaining pages in parallel
     logging.info("Beginning parallel fetch of remaining pages...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         future_to_page = {
-            executor.submit(fetch_page, p): p
-            for p in range(2, total_pages + 1)
+            executor.submit(fetch_page, p): p for p in range(2, int(total_pages) + 1)
         }
 
         for future in concurrent.futures.as_completed(future_to_page):
@@ -516,7 +503,7 @@ def retrieve_pull_requests_gitlab(project_id, access_token, endpoint, max_worker
     merge_requests = retrieve_via_url(project_id, None, access_token, 'merge_requests', endpoint=endpoint, mode='gitlab')
 
     if not merge_requests:
-        logging.warning("No merge requests found.")
+        logging.debug("No merge requests found.")
         return []
 
     total_refs = len(merge_requests)

@@ -22,10 +22,10 @@ fi
 pip install -r requirements.txt
 
 # Read the file line by line
-while IFS="," read -r access_token repo_path storage_path owner repo main_branch endpoint;
+while IFS="," read -r access_token repo_path storage_path owner repo main_branch endpoint mode;
 do
     # Trim leading/trailing whitespace
-    line="${access_token}${repo_path}${storage_path}${owner}${repo}${main_branch}${endpoint}"
+    line="${access_token}${repo_path}${storage_path}${owner}${repo}${main_branch}${endpoint}${mode}"
 
     # Skip empty or whitespace-only lines
     [[ -z "$line" ]] && continue
@@ -43,6 +43,7 @@ OWNER=$owner
 REPO=$repo
 MAIN_BRANCH=$main_branch
 ENDPOINT=$endpoint
+MODE=$mode
 VIRTUAL_ENVIRONMENT_PATH=$VENV_PATH/bin
 EOF
 
