@@ -3,21 +3,22 @@ from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
 from helper.api_access import retrieve_workflow_runs
-from helper.console_access import substract_and_format_time
+from helper.console_access import substract_and_format_time, transform_time
 import json
 import logging
 load_dotenv(override=True)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
 # Setup
-ACCESS_TOKEN = os.getenv('GITHUB_ACCESS_TOKEN')
+ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
 OWNER = os.getenv('OWNER')
 REPO = os.getenv('REPO')
 ENDPOINT = os.getenv('ENDPOINT')
+MODE = os.getenv('MODE')
 storage_path = os.getenv('STORAGE_PATH') + '/workflow_runs.csv'
 
 # Get all runs
-workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN, endpoint= ENDPOINT)
+workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN, endpoint= ENDPOINT, mode=MODE)
 # Safety net
 # with open(storage_path.replace('.csv', '.json'), 'w') as file:
 #     json.dump(workflow_runs, file)
@@ -67,14 +68,17 @@ def get_run_values(run):
     # Compute time_until_completed safely
     time_until_completed = "N/A"
     
-    created_at = datetime.fromisoformat(get_time("created_at"))
-    updated_at = datetime.fromisoformat(get_time("updated_at"))
+    created_at = transform_time(get_time("created_at"))
+    updated_at = transform_time(get_time("updated_at"))
     
     # Calculate time until completed
     time_until_completed = None
-    if run["status"] == "completed" and run.get("conclusion"):
-        completed_at = updated_at
-        time_until_completed = substract_and_format_time(created_at, completed_at)
+    try:
+        if run["status"] == "completed" and run.get("conclusion"):
+            completed_at = updated_at
+            time_until_completed = substract_and_format_time(created_at, completed_at)
+    except:
+        logging.error(run)
 
     return {
         "run_id": run_id,

@@ -11,7 +11,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 # Setup
-ACCESS_TOKEN = os.getenv('GITHUB_ACCESS_TOKEN')
+ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
 OWNER = os.getenv('OWNER')
 REPO = os.getenv('REPO')
 storage_path = os.getenv('STORAGE_PATH') + '/workflow_runs.csv'

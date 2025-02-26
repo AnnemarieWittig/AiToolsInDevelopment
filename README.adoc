@@ -2,25 +2,9 @@
 
 This repository stores scripts for data retrieval in GitHub repositories. They should be easily adjusted for other git-based repository managers.
 
-== Setup
-
-To run the scripts, they require a few **environment variables**, an **internet connection** to use the GitHub API, and a **locally cloned version of the repository**.
-
-The environment file (a `.env` file in root) requires the following information:
-
-- `GITHUB_ACCESS_TOKEN`: Access token to GitHub
-- `REPO_PATH`: Local path to the cloned repository to be analyzed 
-- `STORAGE_PATH`: Path where the script results are stored
-- `OWNER`: Owner of the repository
-- `REPO`: Name of the repository
-- `MAIN_BRANCH`: Primary branch of the analyzed repository
-
-If the used repository manager is a private instance of GitHub, some endpoints might need to be updated in the helper files.  
-These endpoints are in the link:/RepositoryCrawlers/helper/api_access.py[`api_access.py`] file, lines 17-24.
-
 == Analysis
 
-The scripts for analysis can be run without changes if GitHub is used in accordance with the setup. For other repository managers, the handling of responses might need to be adjusted due to different structures.
+The scripts for analysis can be run without changes if GitHub is used in accordance with the setup and, if it is no specialized version, it works with Gitlab, too. For other repository managers, the handling of responses might need to be adjusted due to different structures.
 
 Scripts for analyzing repositories and retrieving data:
 
@@ -45,7 +29,28 @@ Scripts for analyzing repositories and retrieving data:
 Primary scripts are located in `/RepositoryCrawlers`, while the functions interacting with the console and API are in `/RepositoryCrawlers/helpers`.  
 The produced files are the ones needed for analysis.
 
-It is recommended to run the scripts in the same order as listed here. However, aside from file dependencies, none of them are strictly required to be executed sequentially. Depending on the repository size, they may take some time to complete.
+It is recommended to run the scripts in the same order as listed here. However, aside from file dependencies, none of them are strictly required to be executed sequentially. Depending on the repository size, they may take some time to complete. There is also a shell script provided that does everything needed automatically. It is described in the setup chapter, specifically in the section link:#_setup_for_automatic_activation_of_scripts[Setup for automatic activation of scripts].
+
+== Setup for automatic activation of scripts
+
+=== Preparation
+To automatically 
+
+== Setup for manual activation of scripts
+
+To run the scripts, they require a few **environment variables**, an **internet connection** to use the GitHub API, and a **locally cloned version of the repository**.
+
+The environment file (a `.env` file in root) requires the following information:
+
+- `ACCESS_TOKEN`: Access token to GitHub
+- `REPO_PATH`: Local path to the cloned repository to be analyzed 
+- `STORAGE_PATH`: Path where the script results are stored
+- `OWNER`: Owner of the repository
+- `REPO`: Name of the repository
+- `MAIN_BRANCH`: Primary branch of the analyzed repository
+
+If the used repository manager is a private instance of GitHub, some endpoints might need to be updated in the helper files.  
+These endpoints are in the link:/RepositoryCrawlers/helper/api_access.py[`api_access.py`] file, lines 17-24.
 
 == Data Considerations
 

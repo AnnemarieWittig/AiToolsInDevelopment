@@ -15,69 +15,113 @@ logging.basicConfig(
 )
 
 # BASE_URL="https://api.github.com/repos/{owner}/{repo}/{ending}"
-URL_ENDING_PULLS = "pulls"
+URL_ENDING_PULLS_GITHUB = "pulls"
+URL_ENDING_PULLS_GITLAB = "merge_requests"
 URL_ENDING_ISSUES = "issues"
 URL_ENDING_COMMITS = "commits"
 ISSUE_TIMELINE="issues/{issue_number}/timeline"
 ISSUE_COMMENTS="issues/{issue_number}/comments"
-WORKLFOW_RUNS="actions/runs"
+WORKFLOW_RUNS_GITHUB="actions/runs"
+WORKFLOW_RUNS_GITLAB="/pipelines"
 
 MAX_WORKFLOW_RUNS = 10000
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 import requests
 
-def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=True, max_retries=5, backoff_factor=2, endpoint=None, max_pages=None):
-    """
-    Retrieve data from a GitHub repository using the Github API.
+def get_pagination_headers(response, mode):
+    """Extracts pagination headers based on the API mode."""
+    if mode == 'github':
+        return extract_github_pagination(response)
+    elif mode == 'gitlab':
+        return extract_gitlab_pagination(response)
+    return None, None
 
-    :param owner: The GitHub repository owner name.
-    :type owner: str
-    :param repo: The GitHub repository name.
-    :type repo: str
-    :param access_token: A personal access token (classic) with permissions to access the repository.
-    :type access_token: str
-    :param ending: The URL ending to specify the type of data to retrieve (e.g., 'issues', 'pulls').
-    :type ending: str
-    :param parameters: Additional parameters to include in the request.
-    :type parameters: dict
-    :param paginate: Whether to paginate through all available pages.
-    :type paginate: bool
-    :param max_retries: Maximum number of retries for failed requests.
-    :type max_retries: int
-    :param backoff_factor: Factor by which to increase the wait time between retries.
-    :type backoff_factor: int
-    :return: Retrieved data from the GitHub API.
-    :rtype: list or dict
+def extract_github_pagination(response):
+    """Extracts the next page URL and total pages for GitHub."""
+    next_link = None
+    last_link = None
+    total_pages = None
+
+    if 'Link' in response.headers:
+        links = response.headers['Link'].split(',')
+
+        for link in links:
+            link = link.strip()
+            if 'rel="next"' in link:
+                next_link = link[link.find('<') + 1:link.find('>')]
+            if 'rel="last"' in link:
+                last_link = link[link.find('<') + 1:link.find('>')]
+
+        if last_link:
+            try:
+                total_pages = int(last_link.split('page=')[-1].split('&')[0])
+            except ValueError:
+                logging.warning(f"Failed to parse total pages from last_link: {last_link}")
+    # logging.error(next_link)
+    # logging.error(total_pages)
+    return next_link, total_pages
+
+def extract_gitlab_pagination(response):
+    """Extracts the next page number for GitLab."""
+    next_page = response.headers.get('X-Next-Page')
+    total_pages = response.headers.get('X-Total-Pages')
+    return next_page, total_pages
+
+def construct_header(mode, token):
+    if mode == 'github':
+        return {
+            'Accept': 'application/vnd.github+json',
+            'Authorization': f'Bearer {token}',
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+    elif mode == 'gitlab':
+        return {
+            'Accept': 'application/json', 
+            'Authorization': f'Bearer {token}' 
+        }
+    else:
+        raise ValueError(f"Unsupported mode: {mode}")
+
+def construct_url(mode, endpoint, owner, repo, ending, next_page=None):
+    """Constructs the appropriate URL based on the mode (GitHub/GitLab)."""
+    if mode == 'github':
+        return f'{endpoint}/{owner}/{repo}/{ending}'
+    elif mode == 'gitlab':
+        base_url = f'{endpoint}/api/v4/projects/{owner}/{ending}'
+        return f'{base_url}?page={next_page}&per_page=100' if next_page else base_url
+    else:
+        raise ValueError(f"Unsupported mode: {mode}")
+
+def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=True, max_retries=5, backoff_factor=2, endpoint=None, max_pages=None, mode='gitlab'):
+    """
+    Retrieve data from a repository using the API (GitHub or GitLab).
     """
     if endpoint is None:
         logging.error("Endpoint cannot be None.")
         return None
+
+    url = construct_url(mode, endpoint, owner, repo, ending)
+    headers = construct_header(mode, access_token)
+    parameters.setdefault('per_page', 5)
     
-    url = f'{endpoint}/{owner}/{repo}/{ending}'
-
-    headers = {
-        'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {access_token}',
-        'X-GitHub-Api-Version': '2022-11-28'
-    }
-
     all_results = []
     current_page = 1
     total_pages = None
-
+    
     while url:
         try:
             for attempt in range(max_retries):
                 try:
                     response = requests.get(url, headers=headers, params=parameters)
+                    logging.info(f"Fetching {url} with parameters: {parameters}")
                     response.raise_for_status()
-                    break  # If the request is successful, exit the retry loop
+                    break
                 except requests.exceptions.RequestException as e:
-                    if response.status_code in {502, 503, 504} or isinstance(e, requests.exceptions.ChunkedEncodingError):  # Retry for these status codes and ChunkedEncodingError
+                    if response.status_code in {502, 503, 504}:
                         wait_time = backoff_factor * (2 ** attempt)
-                        logging.warning(f"Error {response.status_code} encountered. Retrying in {wait_time} seconds...")
+                        logging.warning(f"Error {response.status_code}. Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                     else:
                         logging.error(f"Request failed: {e}")
@@ -88,45 +132,29 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
 
             result = response.json()
             if paginate:
-                if isinstance(result, list):
-                    all_results.extend(result)
-                else:
-                    all_results.append(result)
+                all_results.extend(result if isinstance(result, list) else [result])
             else:
                 return result
 
-            if paginate and 'Link' in response.headers:
-                links = response.headers['Link'].split(',')
-                next_link = None
-                last_link = None
-                for link in links:
-                    if 'rel="next"' in link:
-                        next_link = link[link.find('<') + 1:link.find('>')]
-                    if 'rel="last"' in link:
-                        last_link = link[link.find('<') + 1:link.find('>')]
-                url = next_link
+            next_page, total_pages = get_pagination_headers(response, mode)
+            url = construct_url(mode, endpoint, owner, repo, ending, next_page) if next_page else None
 
-                if last_link and total_pages is None:
-                    total_pages = int(last_link.split('page=')[-1].split('&')[0])
-
+            if next_page:
                 if total_pages:
                     logging.info(f"Page {current_page} of {total_pages} checked.")
                 else:
                     logging.info(f"Page {current_page} checked.")
 
-                current_page += 1
-                
-                if max_pages != None and max_pages == current_page:
-                    return all_results
-            else:
-                url = None
+            current_page += 1
+            if max_pages and current_page == max_pages:
+                return all_results
 
         except KeyboardInterrupt:
             logging.warning("Process interrupted by user. Saving results to 'partial_results.json'.")
             with open('partial_results.json', 'w') as f:
                 json.dump(all_results, f, indent=4)
             raise
-
+    
     return all_results if paginate else result
 
 def grab_specific_commit(owner, repo, access_token, commit_sha):
@@ -146,7 +174,7 @@ def grab_specific_commit(owner, repo, access_token, commit_sha):
     """
     return retrieve_via_url(owner, repo, access_token, f"{URL_ENDING_COMMITS}/{commit_sha}")
 
-def retrieve_workflow_runs(owner, repo, access_token, endpoint = None, max_pages=None):
+def retrieve_workflow_runs(owner, repo, access_token, endpoint = None, max_pages=None, mode='github'):
     """
     Retrieve workflow runs from a GitHub repository.
 
@@ -156,15 +184,30 @@ def retrieve_workflow_runs(owner, repo, access_token, endpoint = None, max_pages
     :type repo: str
     :param access_token: A personal access token (classic) with permissions to access the repository.
     :type access_token: str
+    :param mode: Specifies whether to retrieve from "github" or "gitlab".
+    :type mode: str
+    
     :return: A list of workflow runs.
     :rtype: list
     """
     # Use the GitHub API to retrieve workflow runs
-    workflow_runs = retrieve_via_url(owner, repo, access_token, WORKLFOW_RUNS, {'per_page': 100}, paginate=True, max_pages=max_pages, endpoint=endpoint)
+    if mode == 'github':
+        ending = WORKFLOW_RUNS_GITHUB
+    elif mode == 'gitlab':
+        ending = WORKFLOW_RUNS_GITLAB
+    else:
+        ending = '/issues'
+    
+    workflow_runs = retrieve_via_url(owner, repo, access_token, ending, {'per_page': 100}, paginate=True, max_pages=max_pages, endpoint=endpoint, mode=mode)
     runs = []
 
     for run in workflow_runs:
-        runs.extend(run['workflow_runs'])
+        if mode == "github":
+            runs.extend(run['workflow_runs'])
+        elif mode == "gitlab":
+            return workflow_runs
+        else:
+            logging.error(f"Mode in workflow run handling unsupported {mode}")
     
     return runs
 
@@ -190,7 +233,7 @@ def retrieve_all_workflow_runs_parallel(owner, repo, access_token):
             owner,
             repo,
             access_token,
-            WORKLFOW_RUNS,
+            None,
             {'per_page': 100},  # Adjust per_page as needed
             True
         ))
@@ -262,7 +305,7 @@ def retrieve_issue_timeline(owner, repo, access_token, issue_number):
     timeline = retrieve_via_url(owner, repo, access_token, ISSUE_TIMELINE.format(issue_number=issue_number), paginate=True)
     return timeline
 
-def retrieve_pull_request_details(owner, repo, access_token, pr_number, endpoint):
+def retrieve_pull_request_details(owner, repo, access_token, pr_number, endpoint, mode):
     """
     Retrieve details of a specific pull request from a GitHub repository.
 
@@ -274,13 +317,18 @@ def retrieve_pull_request_details(owner, repo, access_token, pr_number, endpoint
     :type access_token: str
     :param pr_number: The number of the pull request to retrieve details for.
     :type pr_number: int
+    :param mode: Specifies whether to retrieve from "github" or "gitlab".
+    :type mode: str
+    
     :return: Details of the specified pull request.
     :rtype: dict
     """
-    pull_details = retrieve_via_url(owner, repo, access_token, f"{URL_ENDING_PULLS}/{pr_number}", endpoint=endpoint)
+    ending = f"{URL_ENDING_PULLS_GITHUB}/{pr_number}"
+    
+    pull_details = retrieve_via_url(owner, repo, access_token, ending, endpoint=endpoint, mode=mode)
     return pull_details
 
-def retrieve_issues_parallel(owner, repo, access_token, endpoint):
+def retrieve_issues_parallel(owner, repo, access_token, endpoint, mode):
     """
     Parallel retrieval of issues using concurrent.futures.
     Fetches the first page to determine the total number of pages from the 'Link' header,
@@ -292,19 +340,26 @@ def retrieve_issues_parallel(owner, repo, access_token, endpoint):
     :type repo: str
     :param access_token: A personal access token (classic) with permissions to read issues.
     :type access_token: str
+    :param mode: Specifies whether to retrieve from "github" or "gitlab".
+    :type mode: str
+    
     :return: A list of all issues from the repository.
     :rtype: list
 
     Example usage:
         >>> issues = retrieve_issues_parallel("octocat", "Hello-World", "ghp_12345abc...")
     """
-    base_url=f'{endpoint}/{owner}/{repo}/{URL_ENDING_ISSUES}'
-    # base_url = f"https://api.github.com/repos/{owner}/{repo}/issues"
-    headers = {
-        'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {access_token}',
-        'X-GitHub-Api-Version': '2022-11-28'
-    }
+    
+    if mode == "github":
+        base_url=f'{endpoint}/{owner}/{repo}/{URL_ENDING_ISSUES}'
+        # base_url = f"https://api.github.com/repos/{owner}/{repo}/issues"
+        headers = get_github_header(access_token)
+    
+    if mode == "gitlab":
+        base_url = f'{endpoint}/api/v4/projects/{owner}/{URL_ENDING_ISSUES}'
+        # f"https://git.informatik.uni-leipzig.de/api/v4/projects/{project_id}/issues"
+        headers = get_gitlab_header(access_token)
+        
     params = {
         'state': 'all',
         'per_page': 100
@@ -439,3 +494,79 @@ def retrieve_oldest_comment(owner, repo, issue_number, access_token):
     response.raise_for_status()
     comments = response.json()
     return comments[0] if comments else None
+
+def retrieve_pull_requests_gitlab(project_id, access_token, endpoint, max_workers=5):
+    """
+    Retrieve merge requests (MRs) from a GitLab repository using the GitLab API.
+
+    :param project_id: GitLab project ID (stored as OWNER in scripts).
+    :type project_id: str
+    :param access_token: GitLab personal access token.
+    :type access_token: str
+    :param endpoint: GitLab API endpoint.
+    :type endpoint: str
+    :param max_workers: Maximum number of threads to use for parallel processing, defaults to 5.
+    :type max_workers: int, optional
+
+    :return: A list of dictionaries containing merge request information, structured like GitHub PRs.
+    :rtype: list
+    """
+    # Fetch all MRs using the GitLab API
+    logging.info("Retrieving merge requests from GitLab...")
+    merge_requests = retrieve_via_url(project_id, None, access_token, 'merge_requests', endpoint=endpoint, mode='gitlab')
+
+    if not merge_requests:
+        logging.warning("No merge requests found.")
+        return []
+
+    total_refs = len(merge_requests)
+    logging.info(f"Found {total_refs} merge requests.")
+    
+    # Process MRs in parallel
+    pull_requests = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_mr = {
+            executor.submit(process_single_mr, mr): mr for mr in merge_requests
+        }
+
+        for i, future in enumerate(future_to_mr, start=1):
+            mr = future_to_mr[future]
+            try:
+                mr_data = future.result()
+                if mr_data:
+                    pull_requests.append(mr_data)
+            except Exception as e:
+                logging.error(f"Failed to process MR {mr['id']}: {e}")
+
+            if i % 100 == 0 or i == total_refs:
+                logging.info(f"Processed {i} of {total_refs} merge requests...")
+
+    logging.info(f"Finished processing all {total_refs} merge requests.")
+    return pull_requests
+
+def process_single_mr(mr):
+    """
+    Process a single merge request (MR) to normalize its data for consistency with GitHub PRs.
+
+    :param mr: A dictionary containing merge request metadata.
+    :type mr: dict
+    :param repo_path: Path to the local Git repository.
+    :type repo_path: str
+
+    :return: A dictionary containing normalized merge request information.
+    :rtype: dict
+    """
+    return {
+        'number': mr['iid'],
+        'author': mr['author']['username'],
+        'merger': mr['merged_by']['username'] if mr.get('merged_by') else None,
+        'state': mr['state'],
+        'created_at': mr['created_at'],
+        'updated_at': mr['updated_at'],
+        'closed_at': mr.get('closed_at'),
+        'merged_at': mr.get('merged_at'),
+        'title': mr.get('title', 'N/A'),
+        'requested_reviewers': [reviewer['username'] for reviewer in mr.get('reviewers', [])] if 'reviewers' in mr else [],
+        'labels': mr.get('labels', []),
+        'assignees': [assignee['username'] for assignee in mr.get('assignees', [])],
+    }

@@ -5,7 +5,7 @@ This repository stores scripts for data retrieval in Github repositories. They s
 To run the scripts, they require a few **environment variables**, an **internet connection** to use the Github API and a **locally cloned version of the repository**
 
 The environment file (a `.env` file in root) requires the following information:
-- GITHUB_ACCESS_TOKEN: Access token to Github
+- ACCESS_TOKEN: Access token to Github
 - REPO_PATH: Local path to the cloned repository to be analyzed 
 - STORAGE_PATH: Path where the script results are stored
 - OWNER: Owner of the repository

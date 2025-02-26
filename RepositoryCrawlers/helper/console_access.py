@@ -4,10 +4,11 @@ from datetime import datetime
 import logging
 import concurrent.futures
 import sys
+import re
 
 # Configure logging (file or console; adjust as needed)
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 ########################## Generals
@@ -16,14 +17,64 @@ General utility functions for time calculation and running console commands.
 """
     
 def transform_time(timestr):
-    try: 
+    """
+    Transform a time string into a datetime object.
+
+    This function attempts to parse a given time string into a datetime object using multiple common formats.
+    If the string does not match any of the specified formats, it logs an error message.
+
+    Supported formats:
+    - ISO 8601: '%Y-%m-%dT%H:%M:%S.%f%z'
+    - ISO 8601 without microseconds: '%Y-%m-%dT%H:%M:%S%z'
+    - RFC 2822: '%a, %d %b %Y %H:%M:%S %z'
+    - Custom formats:
+        - '%a %b %d %H:%M:%S %Y %z'
+        - '%Y-%m-%d %H:%M:%S'
+        - '%Y-%m-%d %H:%M:%S.%f'
+        - '%d/%m/%Y %H:%M:%S'
+        - '%d-%m-%Y %H:%M:%S'
+        - '%Y-%m-%dT%H:%M:%S.%f%z'
+        - '%Y-%m-%dT%H:%M:%S.%f%z'
+        - '%Y-%m-%dT%H:%M:%S.%f%z'
+        - '%Y-%m-%dT%H:%M:%S.%f%z'
+
+    :param timestr: The time string to be transformed.
+    :type timestr: str
+    :return: The corresponding datetime object if the format is recognized, otherwise the original string.
+    :rtype: datetime or str
+    """
+    if timestr.lower() == "n/a":
+        return timestr
+
+    # Fix non-standard timezones (e.g., +01:0 → +01:00)
+    timestr = re.sub(r'([+-]\d{2}):(\d{1})$', r'\1:0\2', timestr)  # Converts +01:0 to +01:00
+
+    # Try fromisoformat first (handles many ISO 8601 formats)
+    try:
         return datetime.fromisoformat(timestr)
-    except ValueError as e:
+    except ValueError:
+        pass
+
+    # Define common datetime formats
+    formats = [
+        '%Y-%m-%dT%H:%M:%S.%f%z',
+        '%Y-%m-%dT%H:%M:%S%z',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y-%m-%d %H:%M:%S.%f',
+        '%d/%m/%Y %H:%M:%S',
+        '%d-%m-%Y %H:%M:%S',
+        '%a, %d %b %Y %H:%M:%S %z',
+        '%a %b %d %H:%M:%S %Y %z'
+    ]
+
+    # Try parsing with each format
+    for fmt in formats:
         try:
-            return datetime.strptime(timestr, '%a %b %d %H:%M:%S %Y %z')
-        except:
-            logging.error(f'no valid datetimeformat {timestr}')
-    
+            return datetime.strptime(timestr, fmt)
+        except ValueError:
+            continue
+
+    logging.error(f'No valid datetime format found for "{timestr}"')
     return timestr
 
 def substract_and_format_time(start, end):
@@ -1268,7 +1319,6 @@ def retrieve_pr_metadata_bulk(repo_path):
     pr_refs_args = [
         "for-each-ref",
         "--format=%(refname)|%(objectname)|%(authorname)|%(authordate)|%(subject)", 
-        # "--date=iso-strict",
         "refs/remotes/origin/pull"
     ]
     pr_refs_output = run_git_command(pr_refs_args, repo_path=repo_path)

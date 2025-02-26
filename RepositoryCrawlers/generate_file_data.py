@@ -5,6 +5,8 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 
+invalid_file_endings = ['.png', '.svg', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.ico']
+
 load_dotenv(override=True)
 
 REPO_PATH = os.getenv('REPO_PATH')
@@ -28,6 +30,9 @@ for _, commit in commits.iterrows():
     commit_files = []
     for change in file_changes:
         file_path = change["file_path"]
+        
+        # if any(file_path.endswith(ending) for ending in invalid_file_endings):
+        #     continue
         
         # Retrieve file content to calculate line count
         file_content = retrieve_file_content(commit_sha, file_path, REPO_PATH)
