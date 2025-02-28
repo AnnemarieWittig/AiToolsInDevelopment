@@ -476,6 +476,7 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
     :return: A list of commit dictionaries, where each dictionary contains:
                 {
                     "sha": str,
+                    "author_username": str,
                     "author": str,
                     "date": datetime,
                     "message": str,
@@ -507,7 +508,7 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
         "--all",
         "--numstat",
         "--date=iso-strict",
-        "--pretty=format:COMMIT|%H|%an|%ad|%s|%P"
+        "--pretty=format:COMMIT|%H|%an|%ad|%s|%ae|%P"
     ]
     output = run_git_command(git_cmd, cwd=repo_path)
 
@@ -523,14 +524,15 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
                 detailed_commits.append(current_commit)
 
             # Parse commit metadata: COMMIT|<sha>|<author>|<date>|<message>|<parents...>
-            parts = line.split("|", 6)
+            parts = line.split("|", 7)
             # Make sure we have at least 6 parts:
             #   0: "COMMIT"
             #   1: sha
             #   2: author
             #   3: date
             #   4: message
-            #   5: parents
+            #   5: author-mail
+            #   6: parents
             if len(parts) < 6:
                 continue
 
@@ -538,11 +540,13 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
             author = parts[2]
             date_str = parts[3]
             message = parts[4]
-            parent_shas = parts[5].split() if parts[5] else []
+            mail = parts[5]
+            parent_shas = parts[6].split() if parts[6] else []
 
             current_commit = {
                 "sha": sha,
-                "author": author,
+                "author_username": author,
+                "author": mail,
                 "date": datetime.fromisoformat(date_str),
                 "message": message,
                 "parents": parent_shas,
@@ -755,6 +759,7 @@ def format_fast_forwarded_branch(branch):
             'branch_name': branch,
             'commits' : None,
             'created_at' : None,
+            'created_by_username' : None,
             'created_by' : None,
             'first_commit_sha' : None,
             'last_active' : None,

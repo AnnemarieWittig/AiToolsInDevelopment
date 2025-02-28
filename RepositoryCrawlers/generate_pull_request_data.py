@@ -128,4 +128,9 @@ for pull_request in pull_requests:
 
 # Store
 df = pd.DataFrame(results)
+
+# if len(df) > 0:
+#     df = hash_and_replace_substrings(df, 'author', 'author_username')
+#     df.drop(columns=['author_username'], inplace=True)
+    
 df.to_csv(storage_path.replace('.json', '.csv'), index=False)

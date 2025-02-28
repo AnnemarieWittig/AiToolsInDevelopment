@@ -1,97 +1,117 @@
 = Extract Repository Data
 
-This repository stores scripts for data retrieval in GitHub repositories. They should be easily adjusted for other git-based repository managers.
+This repository contains scripts for retrieving data from GitHub repositories, with easy adaptability for other Git-based repository managers.
+
+:toc:
 
 == Analysis
 
-The scripts for analysis can be run without changes if GitHub is used in accordance with the setup and, if it is no specialized version, it works with Gitlab, too. For other repository managers, the handling of responses might need to be adjusted due to different structures.
+These analysis scripts run without modifications for GitHub, provided it follows the standard setup. If GitLab is used (in a non-specialized version), they should also work. For other repository managers, response handling may require adjustments due to structural differences.
 
-Scripts for analyzing repositories and retrieving data:
+Scripts for analyzing repositories and extracting data:
 
-- link:/RepositoryCrawlers/generate_commit_data.py[`Commits`]
-  - Produces: `{STORAGE_PATH}/commits.csv`
-- link:/RepositoryCrawlers/generate_file_data.py[`Files per commit, specifically their changes`] _(MUST be run **after** commits, as it accesses the commits file)_
-  - Produces: `{STORAGE_PATH}/files.json`
-- link:/RepositoryCrawlers/generate_release_data.py[`Releases`]
-  - Produces: `{STORAGE_PATH}/releases.csv`
-- link:/RepositoryCrawlers/generate_issue_data.py[`Issues and issue data`]
-  - Produces: `{STORAGE_PATH}/issues.csv`
-  - The issue retrieval filters out bot-made changes. If a bot interacts with your repository, you can add their name to the list in line 19.
-- link:/RepositoryCrawlers/generate_branch_data.py[`Branches`]
-  - Produces: `{STORAGE_PATH}/branches.csv`
-- link:/RepositoryCrawlers/generate_build_data.py[`Builds`]
-  - Produces: `{STORAGE_PATH}/workflow_runs.csv`
-  - Intermediate file _(only as a safety net in case the processing of the workflows runs into errors)_: `{STORAGE_PATH}/workflow_runs.json`
-- link:/RepositoryCrawlers/generate_pull_request_data.py[`Pull requests`]
-  - Produces: `{STORAGE_PATH}/pull_requests.csv`
-  - Intermediate file _(only as a safety net in case the processing of the workflows runs into errors)_: `{STORAGE_PATH}/pull_requests.json`
+*  link:/RepositoryCrawlers/generate_commit_data.py[`Commits`]
+** Outputs: `{STORAGE_PATH}/commits.csv`
+*  link:/RepositoryCrawlers/generate_file_data.py[`Files per commit (modifications)`] _(Must be executed **after** the commit script, as it accesses the commit data)_
+** Outputs: `{STORAGE_PATH}/files.json`
+*  link:/RepositoryCrawlers/generate_release_data.py[`Releases`]
+** Outputs: `{STORAGE_PATH}/releases.csv`
+*  link:/RepositoryCrawlers/generate_issue_data.py[`Issues and issue details`]
+** Outputs: `{STORAGE_PATH}/issues.csv`
+** Bot-generated changes are filtered out. If needed, add bot names to the exclusion list (line 19).
+*  link:/RepositoryCrawlers/generate_branch_data.py[`Branches`]
+** Outputs: `{STORAGE_PATH}/branches.csv`
+*  link:/RepositoryCrawlers/generate_build_data.py[`Builds`]
+** Outputs: `{STORAGE_PATH}/workflow_runs.csv`
+** Intermediate file _(used as a safeguard in case workflow processing encounters errors, currently deactivated)_: `{STORAGE_PATH}/workflow_runs.json`
+*  link:/RepositoryCrawlers/generate_pull_request_data.py[`Pull requests`]
+** Outputs: `{STORAGE_PATH}/pull_requests.csv`
+** Intermediate file _(used as a safeguard in case workflow processing encounters errors, currently deactivated)_: `{STORAGE_PATH}/pull_requests.json`
 
-Primary scripts are located in `/RepositoryCrawlers`, while the functions interacting with the console and API are in `/RepositoryCrawlers/helpers`.  
-The produced files are the ones needed for analysis.
+Primary scripts are located in `/RepositoryCrawlers`, while console and API interaction functions are in `/RepositoryCrawlers/helpers`. The generated files serve as the dataset for analysis.
 
-It is recommended to run the scripts in the same order as listed here. However, aside from file dependencies, none of them are strictly required to be executed sequentially. Depending on the repository size, they may take some time to complete. There is also a shell script provided that does everything needed automatically. It is described in the setup chapter, specifically in the section link:#_setup_for_automatic_activation_of_scripts[Setup for automatic activation of scripts].
+It is recommended to exectue scripts in the listed order for dependencies. However, apart from interdependencies, execution order is flexible. Execution time varies depending on repository size. A shell script automates execution and is detailed in the link:#_setup_for_automatic_activation_of_scripts[Setup for Automatic Activation of Scripts].
 
-== Setup for automatic activation of scripts
+Scripts use the stored users and emails, retrieved via the git command line, to pseudomizes any personal mentions of developers, creators, etc. using the hashed email-address. In some cases, git does not know the usernames used and thus cannot pseudomize them.
 
-1.  To automatically generate the information of multiple repositories, the repositories and their details must be added to the `file_list.csv`.
+== Setup for Automatic Activation of Scripts
 
-  The file list is a table and has the structure:
-  |===
-  | ACCESS_TOKEN | REPO_PATH | STORAGE_PATH | OWNER | REPO | MAIN_BRANCH | ENDPOINT | MODE | VIRTUAL_ENVIRONMENT_PATH
-  |===
+To execute scripts the scripts automatically, ensure the following prerequisites:
 
-  Example inputs can be found in the current link:./file_list.csv[file_list.csv], explanations for each value can be found in the following chapter, <<Environment-Values>>. *It is important that the file list always ends with an empty line*, to ensure the script can read everything correctly.
+* *List with the repositories* (as detailed below)
+* **Internet connection** (for GitHub API access)
+* **Locally cloned repositories**
 
-2.  Once done, the script has to be started from the root of this repository using the following command:
-  [source,bash]
-  ----
-  bash ./run_multiple.sh
-  ----
+Then, you follow these steps:
 
-*What happens?*
-1. The script automatically creates a python environment and installs the necessary requirements at `current-directory/venv`.
-2. At your chosen storage directory, a folder named after the current repository will be added. *Repositories cannot have the same name and same storage folder.*
-3. The generated files are stored to that directory.
+. To process multiple repositories automatically, add their details to `file_list.csv`.
+   The file structure:
++
+[source,bash]
+----
+ACCESS_TOKEN, REPO_PATH, STORAGE_PATH, OWNER, REPO, MAIN_BRANCH, ENDPOINT, MODE
+----
++
+Example entries can be found in link:./file_list.csv[file_list.csv]. Each field is explained in link:#environment-values[the section on environment variables].. *Ensure the file ends with an empty line* to allow complete reading by the script.
+
+. Start the script from the repository root:
++
+[source,bash]
+----
+bash ./run_multiple.sh
+----
+
+*Execution Process:*
+
+1. A Python virtual environment is created at `current-directory/venv`, and required dependencies are installed.
+2. A folder named after each repository is added to the designated storage directory. *Repositories cannot have the same name within the same storage folder.*
+3. Generated files are stored in their respective directories.
+
+== Setup for Manual Activation of Scripts
+
+To execute scripts manually, ensure the following prerequisites:
+
+*  **Environment variables** (as detailed above)
+*  **Internet connection** (for GitHub API access)
+*  **Locally cloned repository**
+
+Create a `.env` file in the root directory containing the required values. Additionally, include `VIRTUAL_ENVIRONMENT_PATH` specifying the full path to the Python environment.
+
+For private GitHub instances, API URL definitions may need adjustments in link:/RepositoryCrawlers/helper/api_access.py[`api_access.py`].
 
 == Environment Values
-The scripts expect the following environment values:
 
-- `ACCESS_TOKEN`: Access token to GitHub
-- `REPO_PATH`: Local path to the cloned repository to be analyzed 
-- `STORAGE_PATH`: Path where the script results are stored
-- `OWNER`: For Github: Owner of the repository, for Gitlab: Project ID
-- `REPO`: Name of the repository
-- `MAIN_BRANCH`: Primary branch of the analyzed repository, usually is `main`, but might differ
-- `ENDPOINT`: The endpoint of the instance where the repository is stored. For example, for GitHub it is `https://api.github.com`
-- `MODE`: The mode determines, which repository manager is used and how the data is retrieved. Currently supported modes: `github` and `gitlab` - no other input is accepted.
+The scripts rely on the following environment variables:
 
-== Setup for manual activation of scripts
-
-To run the scripts, they require a few **environment variables**, an **internet connection** to use the GitHub API, and a **locally cloned version of the repository**.
-
-The environment file (a `.env` file in root) requires the following information described in the previous chapter. Additionally, it requires another environment variable `VIRTUAL_ENVIRONMENT_PATH` with the full path to the used python environment.
-
-If the used repository manager is a private instance of GitHub, some endpoints might need to be updated in the helper files.  
-These endpoints are in the link:/RepositoryCrawlers/helper/api_access.py[`api_access.py`] file, lines 17-24.
+*  `ACCESS_TOKEN`: GitHub access token
+*  `REPO_PATH`: Local path to the cloned repository for analysis
+*  `STORAGE_PATH`: Directory for storing results
+*  `OWNER`: Repository owner (GitHub) or Project ID (GitLab)
+*  `REPO`: Repository name
+*  `MAIN_BRANCH`: Main branch (typically `main`, but varies)
+*  `ENDPOINT`: API endpoint of the repository manager (e.g., `https://api.github.com` for GitHub)
+*  `MODE`: Repository manager mode (`github` or `gitlab` only)
 
 == Data Considerations
 
 === Workflows
 
-Several workflows might miss their triggering actor due to different reasons. These are usually shown through the event. An example of workflows and actors:
+Certain workflows may lack a triggering actor due to various reasons. The triggering event usually determines the actor presence. Below is an overview:
 
 [options="header",cols="2,1,1"]
 |===
 | Event (`run["event"]`) | Expected `triggering_actor`? | Possible Missing Actor?
 | `push` | pass:[&#10004;] User who pushed | pass:[&#10008;] If a bot pushed (e.g., `github-actions[bot]`)
-| `pull_request` | pass:[&#10004;] User who opened PR | pass:[&#10008;] If PR is from a **fork** with restricted permissions
-| `workflow_dispatch` | pass:[&#10004;] User who manually triggered | pass:[&#10008;] If triggered via API without a user
+| `pull_request` | pass:[&#10004;] User who opened PR | pass:[&#10008;] If PR originates from a **fork** with restricted permissions
+| `workflow_dispatch` | pass:[&#10004;] User who triggered manually | pass:[&#10008;] If triggered via API without a user
 | `repository_dispatch` | pass:[&#10008;] External system trigger | pass:[&#10004;] No actor (unless explicitly set in API request)
 | `schedule` | pass:[&#10008;] Cron job trigger | pass:[&#10004;] No actor (GitHub Actions runs it)
-| `workflow_run` | pass:[&#10008;] Triggered by another workflow | pass:[&#10004;] No actor (since it's automated)
+| `workflow_run` | pass:[&#10008;] Triggered by another workflow | pass:[&#10004;] No actor (automated process)
 | `deployment` | pass:[&#10004;] User or bot initiating a deployment | pass:[&#10008;] If triggered by a bot
 | `release` | pass:[&#10004;] User who created release | pass:[&#10008;] If done by a bot
 | `issue_comment` | pass:[&#10004;] User who commented | pass:[&#10008;] If triggered via API without a user
 | `pull_request_review` | pass:[&#10004;] Reviewer | pass:[&#10008;] If triggered by automation
-| `merge_group` | pass:[&#10004;] User merging multiple PRs | pass:[&#10008;] If GitHub itself initiates merge
+| `merge_group` | pass:[&#10004;] User merging multiple PRs | pass:[&#10008;] If GitHub initiates merge
 |===
+
+This table highlights when actors are expected and when they may be missing due to automation or API restrictions.

@@ -3,7 +3,7 @@ from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
 from helper.git_console_access import retrieve_releases
-from helper.general_purpose import substract_and_format_time
+from helper.anonymizer import replace_all_user_occurences
 
 load_dotenv(override=True)
 
@@ -30,4 +30,6 @@ for release in releases:
 
 # Store
 df = pd.DataFrame(results)
+if len(df)>1:
+    df = replace_all_user_occurences(df, REPO_PATH)
 df.to_csv(storage_path, index=False)

@@ -1,10 +1,10 @@
 import os
-from datetime import datetime
+import json
 import pandas as pd
 from dotenv import load_dotenv
 from helper.api_access import retrieve_workflow_runs
 from helper.general_purpose import substract_and_format_time, transform_time
-import json
+from helper.anonymizer import replace_all_user_occurences
 import logging
 load_dotenv(override=True)
 logging.basicConfig(level=logging.ERROR)
@@ -15,13 +15,14 @@ OWNER = os.getenv('OWNER')
 REPO = os.getenv('REPO')
 ENDPOINT = os.getenv('ENDPOINT')
 MODE = os.getenv('MODE')
+REPO_PATH = os.getenv('REPO_PATH')
 storage_path = os.getenv('STORAGE_PATH') + '/workflow_runs.csv'
 
 # Get all runs
 workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN, endpoint= ENDPOINT, mode=MODE)
 # Safety net
-# with open(storage_path.replace('.csv', '.json'), 'w') as file:
-#     json.dump(workflow_runs, file)
+with open(storage_path.replace('.csv', '.json'), 'w') as file:
+    json.dump(workflow_runs, file)
 # with open(storage_path.replace('.csv', '.json')) as file:
 #     workflow_runs = json.load(file)
 results = []
@@ -32,17 +33,17 @@ counter = 0
 def get_github_run_values(run):
     missing_keys = []
     
-    run_id = get_value("id")
-    name = get_value("name")
-    status = get_value("status")
-    trigger_event = get_value("event")
-    conclusion = get_value("conclusion", "N/A")
-    related_commit = get_value("head_sha")
-    attempts = get_value("run_attempt", "N/A")
-    created_at = get_value("created_at")
-    updated_at = get_value("updated_at")
+    run_id = get_value(run, "id")
+    name = get_value(run, "name")
+    status = get_value(run, "status")
+    trigger_event = get_value(run, "event")
+    conclusion = get_value(run, "conclusion", "N/A")
+    related_commit = get_value(run, "head_sha")
+    attempts = get_value(run, "run_attempt", "N/A")
+    created_at = get_value(run, "created_at")
+    updated_at = get_value(run, "updated_at")
     
-    triggering_actor = get_value("triggering_actor", {})
+    triggering_actor = get_value(run, "triggering_actor", {})
     author = triggering_actor.get("login", "N/A") if isinstance(triggering_actor, dict) else "N/A"
     if author == "N/A":
         missing_keys.append("triggering_actor")
@@ -77,32 +78,28 @@ def get_github_run_values(run):
         "time_until_updated": time_until_completed,
     }
     
-def get_value(key, default="N/A"):
+def get_value(run, key, default="N/A"):
     value = run.get(key, default)
     if value == default:
         missing_keys.append(key)
     return value
 
 def get_time(key, default="N/A"):
-    val = get_value(key, default)
+    val = get_value(run,key, default)
     return val[:-1] if isinstance(val, str) and val.endswith("Z") else val
 
 def get_gitlab_run_values(run):
     missing_keys = []
     
-    run_id = get_value("id")
-    name = get_value("name")
-    status = get_value("status")
-    trigger_event = get_value("source")
+    run_id = get_value(run, "id")
+    name = get_value(run, "name")
+    status = get_value(run, "status")
+    trigger_event = get_value(run, "source")
     conclusion = "Not/Gitlab"
-    related_commit = get_value("sha")
-    attempts = get_value("attempts", "N/A")
-    created_at = get_value("created_at")
-    updated_at = get_value("updated_at")
-    
-    author = get_value("author", "N/A")
-    if author == "N/A":
-        missing_keys.append("author")
+    related_commit = get_value(run, "sha")
+    attempts = get_value(run, "attempts", "N/A")
+    created_at = get_value(run, "created_at")
+    updated_at = get_value(run, "updated_at")
     
     if missing_keys:
         logging.debug(f"Missing keys in run {run_id}: {', '.join(missing_keys)}")
@@ -128,7 +125,7 @@ def get_gitlab_run_values(run):
         "attempts": attempts,
         "created_at": created_at,
         "last_updated_at": updated_at,
-        "author": author,
+        "author": None,
         "time_until_updated": time_until_completed,
     }
 
@@ -149,7 +146,9 @@ for run in workflow_runs:
         results.append(get_github_run_values(run))
     elif MODE == "gitlab":
         results.append(get_gitlab_run_values(run))
-
+    
 # Store
 df = pd.DataFrame(results)
+if len(df) > 0:
+    df = replace_all_user_occurences(df, repo_path=REPO_PATH)
 df.to_csv(storage_path, index=False)

@@ -4,6 +4,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from helper.general_purpose import substract_and_format_time, transform_time
 from helper.api_access import retrieve_issues_parallel
+from helper.anonymizer import replace_all_user_occurences
 import logging
 load_dotenv(override=True)
 
@@ -13,6 +14,7 @@ logging.basicConfig(level=logging.ERROR)
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
 OWNER = os.getenv('OWNER') 
 REPO = os.getenv('REPO') 
+REPO_PATH = os.getenv('REPO_PATH') 
 MODE = os.getenv('MODE')
 BOT_USERS = ['dependabot-preview[bot]', 'dependabot[bot]', 'renovate[bot]']
 STORAGE_PATH = os.getenv('STORAGE_PATH')
@@ -88,4 +90,6 @@ for issue in issues:
 
 # Store
 df = pd.DataFrame(results)
+if (len(df) > 1):
+    df = replace_all_user_occurences(df, REPO_PATH)
 df.to_csv(STORAGE_PATH + '/issues.csv', index=False)

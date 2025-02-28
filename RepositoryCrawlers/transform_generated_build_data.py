@@ -2,7 +2,8 @@ import os
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.git_console_access import substract_and_format_time
+from helper.anonymizer import replace_all_user_occurences
+from helper.general_purpose import substract_and_format_time
 import ijson
 import logging
 import json
@@ -14,6 +15,7 @@ logging.basicConfig(level=logging.ERROR)
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
 OWNER = os.getenv('OWNER')
 REPO = os.getenv('REPO')
+REPO_PATH = os.getenv('REPO_PATH')
 storage_path = os.getenv('STORAGE_PATH') + '/workflow_runs.csv'
 
 json_file_path = storage_path.replace('.csv', '.json')
@@ -105,6 +107,8 @@ with open(json_file_path, "r", encoding="utf-8") as file:
 # Store in CSV
 logging.info(f'Total processed workflow runs: {counter}')
 df = pd.DataFrame(results)
+if len (df) > 1:
+    df = replace_all_user_occurences(df, REPO_PATH)
 df.to_csv(storage_path, index=False)
 
 with open(storage_path.replace(".csv", "_missing_values.json"), "w") as f:

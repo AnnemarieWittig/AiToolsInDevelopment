@@ -25,6 +25,56 @@ def hash_string_sha256(input_string):
     """
     return hashlib.sha256(input_string.lower().encode('utf-8')).hexdigest()
 
+import pandas as pd
+import hashlib
+
+def hash_string_sha256(input_string):
+    return hashlib.sha256(input_string.lower().encode('utf-8')).hexdigest()
+
+def hash_and_replace_substrings(df, column_name, voluntary_column=None):
+    """
+    Checks for substrings in a specified column, hashes them, and replaces all occurrences in the dataframe.
+    Additionally, if a voluntary column is provided, its contents are also checked and replaced.
+    
+    :param df: The dataframe to process.
+    :type df: pd.DataFrame
+    :param column_name: The name of the column to check for substrings.
+    :type column_name: str
+    :param voluntary_column: An optional column to check for occurrences and replace.
+    :type voluntary_column: str or None
+    
+    :return: The modified dataframe with substrings replaced by their hashed values.
+    :rtype: pd.DataFrame
+    """
+    df_copy = df.copy()
+
+    # Step 1: Create a hash mapping for `column_name` values
+    hash_mapping = {}
+    if column_name in df_copy.columns:
+        unique_values = df_copy[column_name].dropna().astype(str).unique()
+        hash_mapping = {value: hash_string_sha256(value) for value in unique_values}
+
+        # Replace `column_name` values with their hash
+        df_copy[column_name] = df_copy[column_name].replace(hash_mapping)
+
+    # Step 2: Map voluntary_column values to the same hash from column_name
+    replacement_mapping = {}
+    if voluntary_column and voluntary_column in df_copy.columns:
+        for index, row in df.iterrows():
+            author_value = row[column_name]
+            author_username_value = row[voluntary_column]
+            
+            if pd.notna(author_value) and pd.notna(author_username_value) and author_value in hash_mapping:
+                replacement_mapping[author_username_value] = hash_mapping[author_value]
+
+    # Step 3: Replace occurrences across the entire DataFrame using the same hash
+    combined_mapping = {**hash_mapping, **replacement_mapping}
+    for value, hashed_value in combined_mapping.items():
+        pattern = rf"\b{re.escape(value)}\b"  # Match whole words only
+        df_copy = df_copy.map(lambda x: re.sub(pattern, hashed_value, x) if isinstance(x, str) else x)
+
+    return df_copy
+
 def transform_time(timestr):
     """
     Transform a time string into a datetime object.
