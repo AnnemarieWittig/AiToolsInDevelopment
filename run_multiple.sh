@@ -54,7 +54,7 @@ EOF
     python3 "./RepositoryCrawlers/generate_commit_data.py"
     python3 "./RepositoryCrawlers/generate_build_data.py"
     python3 "./RepositoryCrawlers/generate_file_data.py"
-    python3 "./RepositoryCrawlers/generate_issue_data.py"
+    # python3 "./RepositoryCrawlers/generate_issue_data.py" #Not used here
     python3 "./RepositoryCrawlers/generate_pull_request_data.py"
     python3 "./RepositoryCrawlers/generate_release_data.py"
 
