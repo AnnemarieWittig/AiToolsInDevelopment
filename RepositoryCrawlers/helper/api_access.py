@@ -111,7 +111,7 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
     url = construct_url(mode, endpoint, owner, repo, ending)
     headers = construct_header(mode, access_token)
     parameters.setdefault('per_page', 100)
-    
+
     all_results = []
     current_page = 1
     total_pages = None
@@ -201,18 +201,16 @@ def retrieve_workflow_runs(owner, repo, access_token, endpoint = None, max_pages
     elif mode == 'gitlab':
         ending = WORKFLOW_RUNS_GITLAB
     else:
-        ending = '/issues'
+        raise ValueError(f"No handling for mode {mode} available")
     
     workflow_runs = retrieve_via_url(owner, repo, access_token, ending, {'per_page': 100}, paginate=True, max_pages=max_pages, endpoint=endpoint, mode=mode)
     runs = []
 
+    if mode == "gitlab":
+        return workflow_runs
+
     for run in workflow_runs:
-        if mode == "github":
-            runs.extend(run['workflow_runs'])
-        elif mode == "gitlab":
-            return workflow_runs
-        else:
-            logging.error(f"Mode in workflow run handling unsupported {mode}")
+        runs.extend(run['workflow_runs'])
     
     return runs
 
