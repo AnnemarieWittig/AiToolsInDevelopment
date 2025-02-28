@@ -793,7 +793,7 @@ def retrieve_branch_data_new(repo_path = ".", main_branch="main", path_to_enviro
     for branch_name in unmerged_split:
         branch_name = branch_name.split(' -> ')[-1].strip()
         if validate_branch(branch_name):
-            unmerged_args = ["show", "--summary", branch_name, "--pretty=format:%H'%ad'%an", "--date=iso-strict", "--no-patch", "^main"]
+            unmerged_args = ["show", "--summary", branch_name, "--pretty=format:%H'%ad'%an", "--date=iso-strict", "--no-patch", f"^{main_branch}"]
             branches.append(retrieve_branch_information(branch_name, unmerged_args,repo_path=repo_path))
     
     branch_args = ["branch", "--all", "--merged"]
