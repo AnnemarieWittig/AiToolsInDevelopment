@@ -9,7 +9,7 @@ import logging
 import json
 
 load_dotenv()
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 # Setup
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
@@ -110,6 +110,3 @@ df = pd.DataFrame(results)
 if len (df) > 1:
     df = replace_all_user_occurences(df, REPO_PATH)
 df.to_csv(storage_path, index=False)
-
-with open(storage_path.replace(".csv", "_missing_values.json"), "w") as f:
-    json.dump(missings, f)

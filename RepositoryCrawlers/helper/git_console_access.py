@@ -476,7 +476,6 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
     :return: A list of commit dictionaries, where each dictionary contains:
                 {
                     "sha": str,
-                    "author_username": str,
                     "author": str,
                     "date": datetime,
                     "message": str,
@@ -508,7 +507,7 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
         "--all",
         "--numstat",
         "--date=iso-strict",
-        "--pretty=format:COMMIT|%H|%an|%ad|%s|%ae|%P"
+        "--pretty=format:COMMIT|%H|%ae|%ad|%s|%P"
     ]
     output = run_git_command(git_cmd, cwd=repo_path)
 
@@ -531,22 +530,19 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
             #   2: author
             #   3: date
             #   4: message
-            #   5: author-mail
-            #   6: parents
-            if len(parts) < 6:
+            #   5: parents
+            if len(parts) < 5:
                 continue
 
             sha = parts[1]
             author = parts[2]
             date_str = parts[3]
             message = parts[4]
-            mail = parts[5]
-            parent_shas = parts[6].split() if parts[6] else []
+            parent_shas = parts[5].split() if parts[5] else []
 
             current_commit = {
                 "sha": sha,
-                "author_username": author,
-                "author": mail,
+                "author": author,
                 "date": datetime.fromisoformat(date_str),
                 "message": message,
                 "parents": parent_shas,
@@ -816,7 +812,7 @@ def retrieve_branch_data_new(repo_path = ".", main_branch="main", path_to_enviro
             else:
                 logging.debug(f"No merge sha for merged branch {branch_name}")
     
-    main_args = ["log", "main", "--all", "--pretty=format:%H'%ad'%an", "--date=iso-strict"]
+    main_args = ["log", main_branch, "--all", "--pretty=format:%H'%ad'%an", "--date=iso-strict"]
     branches.append(retrieve_branch_information(main_branch, main_args, repo_path=repo_path, merged=True))
     
     return branches
@@ -1187,7 +1183,7 @@ def retrieve_releases(repo_path):
     if tags_output:
         for tag in tags_output.splitlines():
             # Get details for each tag
-            tag_details_args = ["show", "--pretty=format:%H|%an|%ad|%s", "--date=iso-strict", tag]
+            tag_details_args = ["show", "--pretty=format:%H|%ae|%ad|%s", "--date=iso-strict", tag]
             tag_details_output = run_git_command(tag_details_args, repo_path=repo_path)
             
             if tag_details_output:
@@ -1285,6 +1281,34 @@ def retrieve_pr_metadata_bulk(repo_path):
 
     return pr_metadata
 
+def retrieve_pr_metadata_via_ls_remote(repo_path):
+    """
+    Retrieve metadata for all PRs in a single bulk operation.
+
+    This function uses `git ls-remote` to get PR metadata from the remote.
+
+    :param repo_path: Path to the local Git repository.
+    :type repo_path: str
+
+    :return: A list of dictionaries containing pull request metadata.
+    :rtype: list
+    """
+    # Run `git ls-remote origin` to get all refs
+    pr_refs_output = run_git_command(["ls-remote", "origin"], repo_path=repo_path)
+    pr_metadata = []
+
+    for line in pr_refs_output.splitlines():
+        parts = line.split("\t")  # Git output is tab-separated
+        if len(parts) == 2 and "refs/pull/" in parts[1]:  # Cross-platform filtering
+            sha, ref = parts
+            pr_number = ref.split("/")[-2]  # Extract PR ID
+            pr_metadata.append({
+                'number': pr_number
+            })
+
+    return pr_metadata
+
+
 def retrieve_pull_requests_parallel(repo_path, max_workers=5):
     """
     Retrieve pull request data using optimized and parallel processing.
@@ -1301,6 +1325,8 @@ def retrieve_pull_requests_parallel(repo_path, max_workers=5):
     """
     # Fetch pull request metadata in bulk
     pr_metadata = retrieve_pr_metadata_bulk(repo_path)
+    if pr_metadata == []:
+        pr_metadata = retrieve_pr_metadata_via_ls_remote(repo_path)
     total_refs = len(pr_metadata)
     logging.info(f"Found {total_refs} pull request references.")
 
@@ -1322,9 +1348,9 @@ def retrieve_pull_requests_parallel(repo_path, max_workers=5):
                 sys.exit(1)  # Exit on failure to ensure no corrupted data processing
 
             if i % 100 == 0 or i == total_refs:
-                logging.info(f"Processed {i} of {total_refs} pull requests...")
+                logging.info(f"Grabbed {i} of {total_refs} pull requests IDs...")
 
-    logging.info(f"Finished processing all {total_refs} pull requests.")
+    logging.info(f"Finished grabbing all {total_refs} pull request IDs.")
     return pull_requests
 
 def process_single_pr(pr, repo_path):

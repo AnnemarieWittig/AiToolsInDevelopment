@@ -1,8 +1,10 @@
+:warning-caption: :warning:
+:toc:
 = Extract Repository Data
 
 This repository contains scripts for retrieving data from GitHub repositories, with easy adaptability for other Git-based repository managers.
 
-:toc:
+toc::[]
 
 == Analysis
 
@@ -34,7 +36,8 @@ It is recommended to exectue scripts in the listed order for dependencies. Howev
 
 Scripts use the stored users and emails, retrieved via the git command line, to pseudomizes any personal mentions of developers, creators, etc. using the hashed email-address. In some cases, git does not know the usernames used and thus cannot pseudomize them.
 
-== Setup for Automatic Activation of Scripts
+== Setup 
+=== For Automatic Activation of Scripts
 
 To execute scripts the scripts automatically, ensure the following prerequisites:
 
@@ -49,7 +52,7 @@ Then, you follow these steps:
 +
 [source,bash]
 ----
-ACCESS_TOKEN, REPO_PATH, STORAGE_PATH, OWNER, REPO, MAIN_BRANCH, ENDPOINT, MODE
+ACCESS_TOKEN, REPO_PATH, STORAGE_PATH, OWNER, REPO, MAIN_BRANCH, ENDPOINT, MODE, PROJECT
 ----
 +
 Example entries can be found in link:./file_list.csv[file_list.csv]. Each field is explained in link:#environment-values[the section on environment variables].. *Ensure the file ends with an empty line* to allow complete reading by the script.
@@ -61,11 +64,10 @@ Example entries can be found in link:./file_list.csv[file_list.csv]. Each field 
 bash ./run_multiple.sh
 ----
 
-*Execution Process:*
-
+TIP: Here is what happens:  
 1. A Python virtual environment is created at `current-directory/venv`, and required dependencies are installed.
 2. A folder named after each repository is added to the designated storage directory. *Repositories cannot have the same name within the same storage folder.*
-3. Generated files are stored in their respective directories.
+3. Generated files and a log file that stores the `run_multiple.sh` output are stored in their respective directories.
 
 == Setup for Manual Activation of Scripts
 
@@ -86,13 +88,27 @@ The scripts rely on the following environment variables:
 *  `ACCESS_TOKEN`: GitHub access token
 *  `REPO_PATH`: Local path to the cloned repository for analysis
 *  `STORAGE_PATH`: Directory for storing results
-*  `OWNER`: Repository owner (GitHub) or Project ID (GitLab)
+*  `OWNER`: Value differs depending on the repository manager:
+** _Github_: Repository owner 
+** _Gitlab_: Project ID, found in your repository settings, under _General_
+** _Azure Repos_: Azure DevOps organization your project is located at (not the project name, in my case it would be AnnemarieWittig)
 *  `REPO`: Repository name
 *  `MAIN_BRANCH`: Main branch (typically `main`, but varies)
 *  `ENDPOINT`: API endpoint of the repository manager (e.g., `https://api.github.com` for GitHub)
-*  `MODE`: Repository manager mode (`github` or `gitlab` only)
+*  `MODE`: Repository manager mode (`github`, `gitlab` or `azure` only)
+*  `PROJECT`: Only relevant for Azure, represents the project name (not the repository!); can be left empty for other MODEs
+
+WARNING: Without the variables, the data retrieval will not work.
 
 == Data Considerations
+
+=== Mode Restrictions
+
+Some of the data we extract might look different or be missing depending on the mode. Those are usually marked as `Not/{MODE}`.
+
+=== Azure Restrictions
+
+Some of the data we retrieve via API (issues / work items, workflows) are set up as part of an azure project, not repository. Thus, we retrieve all issues in the connected project, and not just for the repository.
 
 === Workflows
 

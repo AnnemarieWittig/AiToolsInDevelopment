@@ -13,12 +13,11 @@ VIRTUAL_ENVIRONMENT_PATH = os.getenv('VIRTUAL_ENVIRONMENT_PATH')
 storage_path = os.getenv('STORAGE_PATH') + '/branches.csv'
 
 # Retrieve Branches
-branches = retrieve_branch_data_new(REPO_PATH, MAIN_BRANCH, VIRTUAL_ENVIRONMENT_PATH)
+branches = retrieve_branch_data_new(repo_path=REPO_PATH, main_branch=MAIN_BRANCH, path_to_environment=VIRTUAL_ENVIRONMENT_PATH)
 
 # Store
 df = pd.DataFrame(branches)
 if len(df) > 0:
     df = replace_all_user_occurences(df, REPO_PATH)
-    # df = hash_and_replace_substrings(df, 'created_by', 'created_by_username')
-    # df.drop(columns=['created_by_username'], inplace=True)
+    
 df.to_csv(storage_path, index=False)

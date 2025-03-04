@@ -22,20 +22,6 @@ def get_local_git_users(repo_path=None):
                 users[name] = hashed_email  # Store hashed email by username
                 users[email] = hashed_email
 
-    # cmd = [
-    #     "log", "--format=%aE %aN", "--all | sort -k1,1 -k2,2 | uniq | awk '{emails[$1]=emails[$1]\"|\"$2} END {for (e in emails) print e, emails[e]}'"
-    # ]
-    
-    # git_output = run_git_command(cmd, repo_path=repo_path)
-    # if git_output:
-    #     for line in git_output.split("\n"):
-    #         userlist = line.split("|")
-    #         email = userlist[0]
-    #         hashed_email = hash_string_sha256(email)
-    #         users[email] = hashed_email
-    #         for user in userlist[1:]:
-    #             users[user] = hashed_email
-
     return users
 
 def replace_user_data(df, users_mapping):
@@ -76,8 +62,8 @@ def replace_user_data_in_dict(data_dict, users_mapping):
     return {key: replace_in_value(value, users_mapping) for key, value in data_dict.items()}
 
 def replace_all_user_occurences(df, repo_path):
-    # df, OWNER, REPO, ACCESS_TOKEN, ENDPOINT, MODE
     users_mapping = get_local_git_users(repo_path)
+    print(users_mapping)
     df = replace_user_data(df, users_mapping)
     
     return df

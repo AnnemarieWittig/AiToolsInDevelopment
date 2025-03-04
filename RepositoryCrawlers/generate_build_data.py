@@ -2,12 +2,12 @@ import os
 import json
 import pandas as pd
 from dotenv import load_dotenv
-from helper.api_access import retrieve_workflow_runs
+from helper.api_access import retrieve_workflow_runs, retrieve_via_url
 from helper.general_purpose import substract_and_format_time, transform_time
 from helper.anonymizer import replace_all_user_occurences
 import logging
 load_dotenv(override=True)
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 # Setup
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
@@ -16,13 +16,18 @@ REPO = os.getenv('REPO')
 ENDPOINT = os.getenv('ENDPOINT')
 MODE = os.getenv('MODE')
 REPO_PATH = os.getenv('REPO_PATH')
+PROJECT = os.getenv('PROJECT')
 storage_path = os.getenv('STORAGE_PATH') + '/workflow_runs.csv'
 
 # Get all runs
-workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN, endpoint= ENDPOINT, mode=MODE)
+if MODE == "azure":
+    workflow_runs = retrieve_workflow_runs(OWNER, PROJECT, ACCESS_TOKEN, endpoint= ENDPOINT, mode=MODE)
+else:
+    workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN, endpoint= ENDPOINT, mode=MODE)
+
 # Safety net
-with open(storage_path.replace('.csv', '.json'), 'w') as file:
-    json.dump(workflow_runs, file)
+# with open(storage_path.replace('.csv', '.json'), 'w') as file:
+#     json.dump(workflow_runs, file)
 # with open(storage_path.replace('.csv', '.json')) as file:
 #     workflow_runs = json.load(file)
 results = []
@@ -128,27 +133,64 @@ def get_gitlab_run_values(run):
         "author": None,
         "time_until_updated": time_until_completed,
     }
+    
+def get_azure_run_values(pipelines):
+    results = []
+    if type(pipelines) != list:
+        pipelines = [pipelines["value"]]
+    for countvalue in pipelines:
+        for value in countvalue['value']:
+            name = value["name"]
+            runs = retrieve_via_url(OWNER,PROJECT,ACCESS_TOKEN, ending=f"pipelines/{value["id"]}/runs", endpoint=ENDPOINT, mode=MODE)
+            if type(runs) != list:
+                runs = [runs["value"]]
+            for runcountvalue in runs:
+                for run in runcountvalue["value"]:
+                    createdDate = transform_time(run["createdDate"])
+                    finishedDate = transform_time(run["finishedDate"])
+                    results.append(
+                        {
+                            "run_id": run['id'],
+                            "name": f"{name}-{run['id']}",
+                            "status": run['state'],
+                            "trigger_event": "Not/Azure",
+                            "conclusion": run["result"],
+                            "related_commit": "Not/Azure",
+                            "attempts": "Not/Azure",
+                            "created_at": createdDate,
+                            "last_updated_at": finishedDate,
+                            "author": "Not/Azure",
+                            "time_until_updated": substract_and_format_time(createdDate, finishedDate) if run["finishedDate"] and run["createdDate"] else "N/A",
+                        }
+                    )
+    return results
+    
 
-# Format all runs
-for run in workflow_runs:
-    counter += 1
-    if counter % 100 == 0:
-        logging.info(f'Processed {counter} workflow runs so far')
-    
-    if not run:
-        continue
-    
-    if "created_at" not in run:
-        logging.debug('Run does not contain "created_at" field: %s', run)
-        continue
-    
-    if MODE == "github":
-        results.append(get_github_run_values(run))
-    elif MODE == "gitlab":
-        results.append(get_gitlab_run_values(run))
+if MODE == "azure" and workflow_runs != {} and workflow_runs != []:
+    results = get_azure_run_values(workflow_runs)
+
+else:
+    # Format all runs
+    for run in workflow_runs:
+        counter += 1
+        if counter % 100 == 0:
+            logging.info(f'Processed {counter} workflow runs so far')
+        
+        if not run:
+            continue
+        
+        if "created_at" not in run:
+            logging.debug('Run does not contain "created_at" field: %s', run)
+            continue
+        
+        if MODE == "github":
+            results.append(get_github_run_values(run))
+        elif MODE == "gitlab":
+            results.append(get_gitlab_run_values(run))
     
 # Store
 df = pd.DataFrame(results)
 if len(df) > 0:
     df = replace_all_user_occurences(df, repo_path=REPO_PATH)
+    
 df.to_csv(storage_path, index=False)

@@ -4,6 +4,12 @@ import json
 import os
 import pandas as pd
 from dotenv import load_dotenv
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 invalid_file_endings = ['.png', '.svg', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.ico']
 
@@ -14,6 +20,8 @@ REPO_PATH = os.getenv('REPO_PATH')
 STORAGE_PATH = os.getenv('STORAGE_PATH')
 commits = pd.read_csv(STORAGE_PATH + '/commits.csv')
 
+logging.info("Initializing retrieval of abstract file data.")
+
 files = []
 counter = 0
 for _, commit in commits.iterrows():
@@ -21,7 +29,7 @@ for _, commit in commits.iterrows():
     
     # Update-Logs
     if counter % 100 == 0:
-        print(f"Processed {counter} of {len(commits)} commits")
+        logging.info(f"Processed {counter} of {len(commits)} commits for file-level information.")
         
     commit_sha = commit["sha"]
     # Retrieve file changes for the current commit

@@ -160,3 +160,9 @@ def substract_and_format_time(start, end):
 
     formatted_time = f"{days:02}:{hours:02}:{minutes:02}:{seconds:02}"
     return formatted_time
+
+
+def get_user_name_azure(user):
+    if 'uniqueName' in user and '@' in user['uniqueName']:
+        return user['uniqueName']
+    return user.get('displayName', 'N/A')

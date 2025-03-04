@@ -32,4 +32,5 @@ for release in releases:
 df = pd.DataFrame(results)
 if len(df)>1:
     df = replace_all_user_occurences(df, REPO_PATH)
+    
 df.to_csv(storage_path, index=False)

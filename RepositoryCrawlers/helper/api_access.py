@@ -22,11 +22,12 @@ URL_ENDING_COMMITS = "commits"
 ISSUE_TIMELINE="issues/{issue_number}/timeline"
 ISSUE_COMMENTS="issues/{issue_number}/comments"
 WORKFLOW_RUNS_GITHUB="actions/runs"
-WORKFLOW_RUNS_GITLAB="/pipelines"
+WORKFLOW_RUNS_GITLAB="pipelines"
+WORKFLOW_RUNS_AZURE="pipelines"
+# Azure DevOps API version
+AZURE_API_VERSION = "7.1-preview.3"
 
 MAX_WORKFLOW_RUNS = 10000
-
-logging.basicConfig(level=logging.ERROR)
 
 import requests
 
@@ -36,13 +37,22 @@ def get_pagination_headers(response, mode):
         return extract_github_pagination(response)
     elif mode == 'gitlab':
         return extract_gitlab_pagination(response)
+    elif mode == 'azure':
+        return extract_azure_pagination(response)
     return None, None
 
+def extract_azure_pagination(response):
+    """Extracts pagination information for Azure DevOps."""
+    next_page = response.json().get('continuationToken')  # Azure uses continuationToken
+    total_pages = None  # Azure API doesn't provide total pages upfront
+    return next_page, total_pages
+
 def extract_github_pagination(response):
-    """Extracts the next page URL and total pages for GitHub."""
+    """Extracts the next page number and total pages for GitHub."""
     next_link = None
     last_link = None
     total_pages = None
+    next_page = None
 
     if 'Link' in response.headers:
         links = response.headers['Link'].split(',')
@@ -57,17 +67,34 @@ def extract_github_pagination(response):
         if last_link:
             try:
                 total_pages = int(last_link.split('page=')[-1].split('&')[0])
+                logging.debug(f"Parsed total_pages: {total_pages} from last_link: {last_link}")
             except ValueError:
                 logging.debug(f"Failed to parse total pages from last_link: {last_link}")
-    # logging.error(next_link)
-    # logging.error(total_pages)
-    return next_link, total_pages
+
+        if next_link:
+            try:
+                next_page = int(next_link.split('page=')[-1].split('&')[0])
+                logging.debug(f"Parsed next_page: {next_page} from next_link: {next_link}")
+            except ValueError:
+                logging.debug(f"Failed to parse next page from next_link: {next_link}")
+
+    logging.debug(f"Next page: {next_page}, Total pages: {total_pages}")
+    return next_page, total_pages
 
 def extract_gitlab_pagination(response):
     """Extracts the next page number for GitLab."""
     next_page = response.headers.get('X-Next-Page')
     total_pages = response.headers.get('X-Total-Pages')
     return next_page, total_pages
+
+import base64
+
+def get_azure_header(token):
+    auth_header = base64.b64encode(f":{token}".encode()).decode()
+    return {
+        'Accept': 'application/json',
+        'Authorization': f'Basic {auth_header}'
+    }
 
 def get_gitlab_header(token):
     return {
@@ -87,6 +114,8 @@ def construct_header(mode, token):
         return get_github_header(token)
     elif mode == 'gitlab':
         return get_gitlab_header(token)
+    elif mode == 'azure':
+        return get_azure_header(token)
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
@@ -95,31 +124,42 @@ def construct_url(mode, endpoint, owner, repo, ending, next_page=None):
     if mode == 'github':
         return f'{endpoint}/repos/{owner}/{repo}/{ending}'
     elif mode == 'gitlab':
-        base_url = f'{endpoint}/api/v4/projects/{owner}/{ending}'
-        return f'{base_url}?page={next_page}&per_page=100' if next_page else base_url
+        return f'{endpoint}/api/v4/projects/{owner}/{ending}'
+        return f'{base_url}?page={next_page}' if next_page else base_url
+    elif mode == 'azure':
+        return f'{endpoint}/{owner}/{repo}/_apis/{ending}'
+        return f'{base_url}&continuationToken={next_page}' if next_page else base_url
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
-def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=True, max_retries=5, backoff_factor=2, endpoint=None, max_pages=None, mode='gitlab'):
-    """
-    Retrieve data from a repository using the API (GitHub or GitLab).
-    """
+def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=True, max_retries=5, backoff_factor=2, endpoint=None, max_pages=None, mode='gitlab', api_version=AZURE_API_VERSION):
     if endpoint is None:
         logging.error("Endpoint cannot be None.")
         return None
 
     url = construct_url(mode, endpoint, owner, repo, ending)
     headers = construct_header(mode, access_token)
-    parameters.setdefault('per_page', 100)
+    if mode in {"github", "gitlab"}:
+        parameters.setdefault("per_page", 100)
+    elif mode == "azure":
+        parameters.setdefault("$top", 100)
+        parameters.setdefault("api_version", api_version)
 
     all_results = []
     current_page = 1
     total_pages = None
+    continuation_token = None
+    next_page = None
     
     while url:
         try:
             for attempt in range(max_retries):
                 try:
+                    if mode == "azure" and continuation_token:
+                        parameters["continuationToken"] = continuation_token
+                    if (mode == "github" or mode == "gitlab") and next_page:
+                        parameters["page"] = next_page
+                    logging.debug(parameters)
                     response = requests.get(url, headers=headers, params=parameters)
                     response.raise_for_status()
                     break
@@ -141,10 +181,14 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
             else:
                 return result
 
-            next_page, total_pages = get_pagination_headers(response, mode)
-            url = construct_url(mode, endpoint, owner, repo, ending, next_page) if next_page else None
+            if mode == "azure":
+                continuation_token = response.headers.get("x-ms-continuationtoken")
+                url = construct_url(mode, endpoint, owner, repo, ending) if continuation_token else None
+            else:
+                next_page, total_pages = get_pagination_headers(response, mode)
+                url = construct_url(mode, endpoint, owner, repo, ending) if next_page else None
 
-            if next_page:
+            if continuation_token or next_page:
                 if total_pages:
                     logging.info(f"Page {current_page} of {total_pages} checked.")
                 else:
@@ -152,6 +196,7 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
 
             current_page += 1
             if max_pages and current_page == max_pages:
+                logging.info(f"All {current_page} pages checked.")
                 return all_results
 
         except KeyboardInterrupt:
@@ -200,13 +245,15 @@ def retrieve_workflow_runs(owner, repo, access_token, endpoint = None, max_pages
         ending = WORKFLOW_RUNS_GITHUB
     elif mode == 'gitlab':
         ending = WORKFLOW_RUNS_GITLAB
+    elif mode == 'azure':
+        ending = WORKFLOW_RUNS_AZURE
     else:
         raise ValueError(f"No handling for mode {mode} available")
     
-    workflow_runs = retrieve_via_url(owner, repo, access_token, ending, {'per_page': 100}, paginate=True, max_pages=max_pages, endpoint=endpoint, mode=mode)
+    workflow_runs = retrieve_via_url(owner, repo, access_token, ending, paginate=True, max_pages=max_pages, endpoint=endpoint, mode=mode, api_version="5.1")
     runs = []
 
-    if mode == "gitlab":
+    if mode == "gitlab" or mode == "azure":
         return workflow_runs
 
     for run in workflow_runs:
@@ -353,8 +400,10 @@ def retrieve_issues_parallel(owner, repo, access_token, endpoint, mode):
     elif mode == "gitlab":
         base_url = f'{endpoint}/api/v4/projects/{owner}/{URL_ENDING_ISSUES}'
         headers = get_gitlab_header(access_token)
+    elif mode == "azure":
+        return retrieve_issues_parallel_azure(owner, repo, access_token, endpoint)
     else:
-        raise ValueError("Unsupported mode. Choose 'github' or 'gitlab'.")
+        raise ValueError(f"Unsupported mode: {mode}. Choose 'github', 'azure' or 'gitlab'.")
 
     params = {
         'state': 'all',
@@ -415,6 +464,76 @@ def retrieve_issues_parallel(owner, repo, access_token, endpoint, mode):
                 logging.error(f"Failed to fetch page {page_num}. Error: {e}")
 
     logging.info(f"Finished retrieving all {len(all_issues)} issues from {owner}/{repo}")
+    return all_issues
+
+def retrieve_issues_parallel_azure(organization, project, personal_access_token, endpoint):
+    """
+    Retrieves all work items (issues) from an Azure DevOps project in parallel.
+
+    :param organization: The Azure DevOps organization name.
+    :param project: The Azure DevOps project name.
+    :param personal_access_token: Personal access token with work item read permissions.
+    :param endpoint: Azure DevOps API base URL.
+    
+    :return: A list of all work items with their details.
+    """
+
+    # Base URL for Azure DevOps
+    base_url = f"{endpoint}/{organization}/{project}/_apis/wit"
+    headers = get_azure_header(personal_access_token)
+
+    logging.info(f"Fetching all work items for project: {project}")
+
+    # 1) Fetch all work item IDs using a Wiql query
+    logging.info("Executing Wiql query to retrieve all work item IDs...")
+
+    wiql_url = f"{base_url}/wiql?api-version=5.1"
+    wiql_query = {
+        "query": "SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project"
+    }
+
+    response = requests.post(wiql_url, headers=headers, json=wiql_query)
+    response.raise_for_status()
+    work_items = response.json().get("workItems", [])
+
+    if not work_items:
+        logging.info("No work items found.")
+        return []
+
+    # Extract IDs
+    work_item_ids = [str(item["id"]) for item in work_items]
+    logging.info(f"Total work items retrieved: {len(work_item_ids)}")
+
+    # 2) Fetch full details of work items in batches (Azure limits request size)
+    BATCH_SIZE = 200  # Maximum allowed batch size in Azure API
+    all_issues = []
+
+    def fetch_work_items_batch(batch_ids):
+        """Fetches a batch of work item details from Azure DevOps."""
+        url = f"{base_url}/workitems?ids={','.join(batch_ids)}&api-version={AZURE_API_VERSION}"
+        logging.debug(f"Fetching batch: {batch_ids}")
+        r = requests.get(url, headers=headers)
+        r.raise_for_status()
+        return r.json().get("value", [])
+
+    logging.info(f"Fetching full details for {len(work_item_ids)} work items in parallel...")
+
+    # 3) Fetch work items in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_batch = {
+            executor.submit(fetch_work_items_batch, work_item_ids[i:i+BATCH_SIZE]): i
+            for i in range(0, len(work_item_ids), BATCH_SIZE)
+        }
+
+        for future in concurrent.futures.as_completed(future_to_batch):
+            try:
+                batch_data = future.result()
+                all_issues.extend(batch_data)
+                logging.info(f"Fetched {len(batch_data)} additional work items.")
+            except Exception as e:
+                logging.error(f"Failed to fetch batch. Error: {e}")
+
+    logging.info(f"Finished retrieving all {len(all_issues)} work items from {project}")
     return all_issues
 
 def retrieve_oldest_comments_parallel(owner, repo, access_token, issues, max_workers=5):
@@ -508,25 +627,65 @@ def retrieve_pull_requests_gitlab(project_id, access_token, endpoint, max_worker
     logging.info(f"Found {total_refs} merge requests.")
     
     # Process MRs in parallel
-    pull_requests = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_mr = {
-            executor.submit(process_single_mr, mr): mr for mr in merge_requests
-        }
+    # pull_requests = []
+    # with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    #     future_to_mr = {
+    #         executor.submit(process_single_mr, mr): mr for mr in merge_requests
+    #     }
 
-        for i, future in enumerate(future_to_mr, start=1):
-            mr = future_to_mr[future]
-            try:
-                mr_data = future.result()
-                if mr_data:
-                    pull_requests.append(mr_data)
-            except Exception as e:
-                logging.error(f"Failed to process MR {mr['id']}: {e}")
+    #     for i, future in enumerate(future_to_mr, start=1):
+    #         mr = future_to_mr[future]
+    #         try:
+    #             mr_data = future.result()
+    #             if mr_data:
+    #                 pull_requests.append(mr_data)
+    #         except Exception as e:
+    #             logging.error(f"Failed to process MR {mr['id']}: {e}")
 
-            if i % 100 == 0 or i == total_refs:
-                logging.info(f"Processed {i} of {total_refs} merge requests...")
+    #         if i % 100 == 0 or i == total_refs:
+    #             logging.info(f"Processed {i} of {total_refs} merge requests...")
 
-    logging.info(f"Finished processing all {total_refs} merge requests.")
+    # logging.info(f"Finished processing all {total_refs} merge requests.")
+    return merge_requests
+
+def retrieve_pull_requests_azure(owner, project, repo, access_token, endpoint):
+    """
+    Retrieve raw pull requests from an Azure DevOps repository using the Azure DevOps REST API in parallel.
+
+    :param owner: Azure DevOps organization name.
+    :type owner: str
+    :param project: Azure DevOps project name.
+    :type project: str
+    :param repo: Azure DevOps repository name.
+    :type repo: str
+    :param access_token: Azure DevOps personal access token.
+    :type access_token: str
+    :param endpoint: Azure DevOps API endpoint.
+    :type endpoint: str
+    :param max_workers: Maximum number of threads to use for parallel retrieval, defaults to 5.
+    :type max_workers: int, optional
+
+    :return: A list of raw pull request dictionaries.
+    :rtype: list
+    """
+    logging.info("Retrieving pull requests from Azure DevOps...")
+    
+    repo = f"{repo}.git" if not ".git" in repo else repo
+
+    # Construct the API path for pull requests within a repository
+    api_path = f"git/repositories/{repo}/pullrequests"
+
+    api_version = "7.1"
+
+    # Fetch all pull requests using the Azure DevOps API
+    pull_requests = retrieve_via_url(owner, project, access_token, api_path,
+                                    endpoint=endpoint, mode='azure', api_version=api_version, 
+                                    parameters={"searchCriteria.status": "all"})
+
+    if not pull_requests:
+        logging.debug("No pull requests found.")
+        return []
+    
     return pull_requests
 
 def process_single_mr(mr):

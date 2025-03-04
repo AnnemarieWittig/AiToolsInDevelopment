@@ -1,3 +1,4 @@
-gitlab123,/full/path/to/project/my-lab-repo,./store,5965,Gitlab-Repo,Final,https://git.instanz.de,gitlab
-ghp_123,/full/path/to/project/AiToolsInDevelopment,./store,AnnemarieWittig,AiToolsInDevelopment,main,https://api.github.com,github
-ACCESS_TOKEN,REPO_PATH,STORAGE_PATH,OWNER,REPO,MAIN_BRANCH,ENDPOINT,MODE,VIRTUAL_ENVIRONMENT_PATH
+gitlab123,/full/path/to/project/my-lab-repo,./store,5965,my-lab-repo,Final,https://git.instanz.de,gitlab,
+ghp_123,/full/path/to/project/AiToolsInDevelopment,./store,AnnemarieWittig,AiToolsInDevelopment,main,https://api.github.com,github,
+myazurekey123,/full/path/to/project/my-azure-repo,./store,AnnemarieWittig,my-azure-repo,master,https://dev.azure.com,azure,myproject
+ACCESS_TOKEN,REPO_PATH,STORAGE_PATH,OWNER,REPO,MAIN_BRANCH,ENDPOINT,MODE,PROJECT
