@@ -11,15 +11,15 @@ fi
 
 # Setup environment
 VENV_PATH="$(pwd)/venv"  # This expands to /absolute/path/to/venv
-# python3 -m venv "$VENV_PATH"
-source ./venv/bin/activate
+python3 -m venv "$VENV_PATH"
+source "$(pwd)/venv/bin/activate"
 
-# if [[ -z "$VIRTUAL_ENV" ]]; then
-#     echo "Error: Virtual environment is not activated."
-#     exit 1
-# fi
+if [[ -z "$VIRTUAL_ENV" ]]; then
+    echo "Error: Virtual environment is not activated."
+    exit 1
+fi
 
-# pip install -r requirements.txt
+pip install -r requirements.txt
 
 # Read the file line by line
 while IFS="," read -r access_token repo_path storage_path owner repo main_branch endpoint mode project;
