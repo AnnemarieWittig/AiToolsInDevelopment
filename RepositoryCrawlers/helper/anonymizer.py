@@ -63,7 +63,6 @@ def replace_user_data_in_dict(data_dict, users_mapping):
 
 def replace_all_user_occurences(df, repo_path):
     users_mapping = get_local_git_users(repo_path)
-    print(users_mapping)
     df = replace_user_data(df, users_mapping)
     
     return df
