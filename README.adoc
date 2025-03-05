@@ -55,7 +55,7 @@ Then, you follow these steps:
 ACCESS_TOKEN, REPO_PATH, STORAGE_PATH, OWNER, REPO, MAIN_BRANCH, ENDPOINT, MODE, PROJECT
 ----
 +
-Example entries can be found in link:./file_list.csv[file_list.csv]. Each field is explained in link:#environment-values[the section on environment variables].. *Ensure the file ends with an empty line* to allow complete reading by the script.
+There is no header expected, so the script will read the first line as a repository to extract data from. Example entries can be found in link:./file_list.csv[file_list.csv]. Each field is explained in link:#environment-values[the section on environment variables].. *Ensure the file ends with an empty line* to allow complete reading by the script.
 
 . Start the script from the repository root:
 +
@@ -85,7 +85,7 @@ For private GitHub instances, API URL definitions may need adjustments in link:/
 
 The scripts rely on the following environment variables:
 
-*  `ACCESS_TOKEN`: GitHub access token
+*  `ACCESS_TOKEN`: The access token to your repository manager; They are required to have at minimum read access.
 *  `REPO_PATH`: Local path to the cloned repository for analysis
 *  `STORAGE_PATH`: Directory for storing results
 *  `OWNER`: Value differs depending on the repository manager:
