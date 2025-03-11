@@ -2,13 +2,15 @@
 :toc:
 = Extract Repository Data
 
-This repository contains scripts for retrieving data from GitHub repositories, with easy adaptability for other Git-based repository managers.
+git_console_access.py l 804 anpassen falls anderer environment manager
+
+This repository contains scripts for retrieving data from Git based repositories, with easy adaptability for other Git-based repository managers.
 
 toc::[]
 
 == Analysis
 
-These analysis scripts run without modifications for GitHub, provided it follows the standard setup. If GitLab is used (in a non-specialized version), they should also work. For other repository managers, response handling may require adjustments due to structural differences.
+These analysis scripts run without modifications for GitHub, provided it follows the standard setup. If GitLab or Azure is used (in a non-specialized version), they should also work. For other repository managers, response handling and request endpoints may require adjustments due to structural differences. However, the non-API reliant scripts will work with any git repository.
 
 Scripts for analyzing repositories and extracting data:
 
@@ -42,8 +44,9 @@ Scripts use the stored users and emails, retrieved via the git command line, to 
 To execute scripts the scripts automatically, ensure the following prerequisites:
 
 * *List with the repositories* (as detailed below)
-* **Internet connection** (for GitHub API access)
+* **Internet connection** (for API access)
 * **Locally cloned repositories**
+* **Usage of Python virtualenv** as it is used to automatically create the environment and install the dependencies.
 
 Then, you follow these steps:
 
@@ -64,22 +67,22 @@ There is no header expected, so the script will read the first line as a reposit
 bash ./run_multiple.sh
 ----
 
-TIP: Here is what happens:  
-1. A Python virtual environment is created at `current-directory/venv`, and required dependencies are installed.
-2. A folder named after each repository is added to the designated storage directory. *Repositories cannot have the same name within the same storage folder.*
-3. Generated files and a log file that stores the `run_multiple.sh` output are stored in their respective directories.
+TIP: Here is what happens:   
+1. A Python virtual environment is created at `current-directory/venv`, and required dependencies are installed.  
+2. A folder named after each repository is added to the designated storage directory. *Repositories cannot have the same name within the same storage folder.*  
+3. Generated files and a log file that stores the `run_multiple.sh` output are stored in their respective directories.  
 
 == Setup for Manual Activation of Scripts
 
 To execute scripts manually, ensure the following prerequisites:
 
 *  **Environment variables** (as detailed above)
-*  **Internet connection** (for GitHub API access)
+*  **Internet connection** (for API access)
 *  **Locally cloned repository**
 
 Create a `.env` file in the root directory containing the required values. Additionally, include `VIRTUAL_ENVIRONMENT_PATH` specifying the full path to the Python environment.
 
-For private GitHub instances, API URL definitions may need adjustments in link:/RepositoryCrawlers/helper/api_access.py[`api_access.py`].
+For private git instances, API URL definitions may need adjustments in link:/RepositoryCrawlers/helper/api_access.py[`api_access.py`].
 
 == Environment Values
 
