@@ -1308,6 +1308,28 @@ def retrieve_pr_metadata_via_ls_remote(repo_path):
 
     return pr_metadata
 
+def retrieve_pr_metadata_via_ls_remote(repo_path):
+    """
+    Retrieve pull request metadata for Bitbucket via `git ls-remote`.
+
+    :param repo_path: Path to the local Git repository.
+    :type repo_path: str
+    :return: A list of dictionaries with pull request metadata.
+    :rtype: list
+    """
+    pr_refs = run_git_command(["ls-remote", "origin", "refs/pull-requests/*/from"], repo_path)
+    
+    pull_requests = []
+    if pr_refs:
+        for line in pr_refs.splitlines():
+            parts = line.split()
+            if len(parts) == 2:
+                commit_hash, ref = parts
+                pr_number = ref.split("/")[2]  # Extract PR number
+                pull_requests.append({"number": int(pr_number), "sha": commit_hash})
+
+    return pull_requests
+
 
 def retrieve_pull_requests_parallel(repo_path, max_workers=5):
     """

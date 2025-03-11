@@ -2,7 +2,7 @@ import os, json
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-from helper.git_console_access import run_git_command, retrieve_pull_requests_parallel
+from helper.git_console_access import run_git_command, retrieve_pull_requests_parallel, retrieve_pr_metadata_via_ls_remote
 from helper.general_purpose import transform_time, substract_and_format_time, get_user_name_azure
 from helper.api_access import retrieve_pull_request_details, retrieve_pull_requests_gitlab, retrieve_pull_requests_azure
 from helper.anonymizer import replace_all_user_occurences
@@ -46,6 +46,49 @@ def get_pr_detail_github(owner, repo, access_token, pr_number, endpoint):
         'labels': [label['name'] for label in pr_details.get('labels', [])],
         'assignees': [assignee['login'] if 'login' in assignee else assignee for assignee in pr_details.get('assignees', [])],
     }
+    
+def get_pr_detail_bitbucket(project, repo, access_token, pr_number, endpoint):
+    """
+    Retrieve details of a specific pull request from Bitbucket.
+
+    :param project: The Bitbucket owner name.
+    :type project: str
+    :param repo: The Bitbucket repository name.
+    :type repo: str
+    :param access_token: A personal access token with API permissions.
+    :type access_token: str
+    :param pr_number: The number of the pull request to retrieve details for.
+    :type pr_number: int
+    :param endpoint: Bitbucket API endpoint.
+    :type endpoint: str
+    :param mode: The repository service (Bitbucket).
+    :type mode: str
+    
+    :return: Details of the specified pull request.
+    :rtype: dict
+    """
+    # Fetch PR details
+    pr_details = retrieve_pull_request_details(project, repo, access_token, pr_number, endpoint, MODE)
+    if not pr_details:
+        return None
+
+    return {
+        'merge_id': pr_details["id"],
+        'sha': pr_details.get("toRef", {}).get("latestCommit"),  # Use the target branch's latest commit
+        'author': pr_details['author']['user']['name'] if 'user' in pr_details['author'] else pr_details['author'],
+        'merged_by': pr_details.get('closedBy', {}).get('name') if pr_details.get('closedBy') else None,
+        'merged_at': pr_details.get('closedDate') if pr_details.get('state') == 'MERGED' else None,
+        'state': pr_details['state'],
+        'created_at': pr_details['createdDate'],
+        'updated_at': pr_details.get('updatedDate'),
+        'closed_at': pr_details.get('closedDate'),
+        'title': pr_details.get('title', 'N/A'),
+        'description': pr_details.get('description', 'N/A'),
+        'requested_reviewers': [reviewer['user']['name'] for reviewer in pr_details.get('reviewers', [])],
+        'labels': pr_details.get('labels', []),  # Bitbucket doesn't always return labels
+        'assignees': [reviewer['user']['name'] for reviewer in pr_details.get('reviewers', [])],  # Use reviewers as assignees
+    }
+
 
 def get_pr_detail_gitlab(pull_request):
     return {
@@ -119,6 +162,8 @@ elif MODE == "azure":
     for group in pull_requests:
         pr.extend(group["value"])
     pull_requests = pr
+elif MODE == "bitbucket":
+    pull_requests = retrieve_pr_metadata_via_ls_remote(REPO_PATH)
 else:
     raise ValueError(f"No settings for pr retrieval for mode {MODE}")
 
@@ -136,6 +181,8 @@ for pull_request in pull_requests:
         pr_details = get_pr_detail_gitlab(pull_request)
     elif MODE == 'azure':
         pr_details = get_pr_detail_azure(pull_request)
+    elif MODE == 'bitbucket':
+        pr_details = get_pr_detail_bitbucket(PROJECT, REPO, ACCESS_TOKEN, pull_request['number'], ENDPOINT)
     else:
         raise ValueError(f"No mode for pull request extraction: {MODE}")
     

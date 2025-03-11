@@ -17,6 +17,7 @@ logging.basicConfig(
 # BASE_URL="https://api.github.com/repos/{owner}/{repo}/{ending}"
 URL_ENDING_PULLS_GITHUB = "pulls"
 URL_ENDING_PULLS_GITLAB = "merge_requests"
+URL_ENDING_PULLS_BITBUCKET = "pull-requests"
 URL_ENDING_ISSUES = "issues"
 URL_ENDING_COMMITS = "commits"
 ISSUE_TIMELINE="issues/{issue_number}/timeline"
@@ -24,22 +25,31 @@ ISSUE_COMMENTS="issues/{issue_number}/comments"
 WORKFLOW_RUNS_GITHUB="actions/runs"
 WORKFLOW_RUNS_GITLAB="pipelines"
 WORKFLOW_RUNS_AZURE="pipelines"
+WORKFLOW_RUNS_BITBUCKET="pipelines"
 # Azure DevOps API version
 AZURE_API_VERSION = "7.1-preview.3"
 
 MAX_WORKFLOW_RUNS = 10000
 
-import requests
-
 def get_pagination_headers(response, mode):
-    """Extracts pagination headers based on the API mode."""
     if mode == 'github':
         return extract_github_pagination(response)
     elif mode == 'gitlab':
         return extract_gitlab_pagination(response)
     elif mode == 'azure':
         return extract_azure_pagination(response)
+    elif mode == 'bitbucket':
+        return extract_bitbucket_pagination(response)
     return None, None
+
+def extract_bitbucket_pagination(response):
+    """Extracts pagination info from Bitbucket API."""
+    last_page = response.json().get('isLastPage', False)
+    if last_page == True:
+        return None, None
+    next_page = response.json().get('nextPageStart')  # Bitbucket provides a 'next' URL
+    total_pages = None  # Bitbucket does not provide total pages
+    return next_page, total_pages
 
 def extract_azure_pagination(response):
     """Extracts pagination information for Azure DevOps."""
@@ -112,23 +122,23 @@ def get_github_header(token):
 def construct_header(mode, token):
     if mode == 'github':
         return get_github_header(token)
-    elif mode == 'gitlab':
+    elif mode == 'gitlab' or mode=='bitbucket': # they have the same header
         return get_gitlab_header(token)
     elif mode == 'azure':
         return get_azure_header(token)
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
-def construct_url(mode, endpoint, owner, repo, ending, next_page=None):
+def construct_url(mode, endpoint, owner, repo, ending):
     """Constructs the appropriate URL based on the mode (GitHub/GitLab)."""
     if mode == 'github':
         return f'{endpoint}/repos/{owner}/{repo}/{ending}'
     elif mode == 'gitlab':
         return f'{endpoint}/api/v4/projects/{owner}/{ending}'
-        return f'{base_url}?page={next_page}' if next_page else base_url
     elif mode == 'azure':
         return f'{endpoint}/{owner}/{repo}/_apis/{ending}'
-        return f'{base_url}&continuationToken={next_page}' if next_page else base_url
+    elif mode == 'bitbucket':
+        return f'{endpoint}/rest/api/1.0/projects/{owner}/repos/{repo}/{ending}'
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
@@ -141,6 +151,8 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
     headers = construct_header(mode, access_token)
     if mode in {"github", "gitlab"}:
         parameters.setdefault("per_page", 100)
+    elif mode == "bitbucket":
+        parameters.setdefault("limit", 100)
     elif mode == "azure":
         parameters.setdefault("$top", 100)
         parameters.setdefault("api_version", api_version)
@@ -157,8 +169,10 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
                 try:
                     if mode == "azure" and continuation_token:
                         parameters["continuationToken"] = continuation_token
-                    if (mode == "github" or mode == "gitlab") and next_page:
+                    elif (mode == "github" or mode == "gitlab") and next_page:
                         parameters["page"] = next_page
+                    elif (mode == "bitbucket") and next_page:
+                        parameters["start"] = next_page
                     logging.debug(parameters)
                     response = requests.get(url, headers=headers, params=parameters)
                     response.raise_for_status()
@@ -177,7 +191,13 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
 
             result = response.json()
             if paginate:
-                all_results.extend(result if isinstance(result, list) else [result])
+                if mode == "bitbucket":
+                    if "values" in result:
+                        all_results.extend(result["values"])
+                    else:
+                        logging.debug("Bitbucket response did not contain 'values'. Check API response format.")
+                else:
+                    all_results.extend(result if isinstance(result, list) else [result])
             else:
                 return result
 
@@ -224,42 +244,33 @@ def grab_specific_commit(owner, repo, access_token, commit_sha):
     """
     return retrieve_via_url(owner, repo, access_token, f"{URL_ENDING_COMMITS}/{commit_sha}")
 
-def retrieve_workflow_runs(owner, repo, access_token, endpoint = None, max_pages=None, mode='github'):
+def retrieve_workflow_runs(owner, repo, access_token, endpoint=None, max_pages=None, mode='github'):
     """
-    Retrieve workflow runs from a GitHub repository.
-
-    :param owner: The GitHub repository owner name.
-    :type owner: str
-    :param repo: The GitHub repository name.
-    :type repo: str
-    :param access_token: A personal access token (classic) with permissions to access the repository.
-    :type access_token: str
-    :param mode: Specifies whether to retrieve from "github" or "gitlab".
-    :type mode: str
-    
-    :return: A list of workflow runs.
-    :rtype: list
+    Retrieve workflow runs from GitHub, GitLab, Azure, or Bitbucket.
     """
-    # Use the GitHub API to retrieve workflow runs
     if mode == 'github':
         ending = WORKFLOW_RUNS_GITHUB
     elif mode == 'gitlab':
         ending = WORKFLOW_RUNS_GITLAB
     elif mode == 'azure':
         ending = WORKFLOW_RUNS_AZURE
+    elif mode == 'bitbucket':
+        ending = WORKFLOW_RUNS_BITBUCKET
     else:
         raise ValueError(f"No handling for mode {mode} available")
     
     workflow_runs = retrieve_via_url(owner, repo, access_token, ending, paginate=True, max_pages=max_pages, endpoint=endpoint, mode=mode, api_version="5.1")
     runs = []
 
-    if mode == "gitlab" or mode == "azure":
+    if mode == "gitlab" or mode == "azure" or mode == "bitbucket":
         return workflow_runs
 
+    runs = []
     for run in workflow_runs:
         runs.extend(run['workflow_runs'])
     
     return runs
+
 
 def retrieve_all_workflow_runs_parallel(owner, repo, access_token):
     """
@@ -373,7 +384,10 @@ def retrieve_pull_request_details(owner, repo, access_token, pr_number, endpoint
     :return: Details of the specified pull request.
     :rtype: dict
     """
-    ending = f"{URL_ENDING_PULLS_GITHUB}/{pr_number}"
+    if mode == "github":
+        ending = f"{URL_ENDING_PULLS_GITHUB}/{pr_number}"
+    elif mode == "bitbucket":
+        ending = f"{URL_ENDING_PULLS_BITBUCKET}/{pr_number}"
     
     pull_details = retrieve_via_url(owner, repo, access_token, ending, endpoint=endpoint, mode=mode)
     return pull_details

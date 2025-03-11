@@ -95,11 +95,16 @@ The scripts rely on the following environment variables:
 ** _Github_: Repository owner 
 ** _Gitlab_: Project ID, found in your repository settings, under _General_
 ** _Azure Repos_: Azure DevOps organization your project is located at (not the project name, in my case it would be AnnemarieWittig)
+** _Bitbucket_: Not relevant, can be left empty
 *  `REPO`: Repository name
 *  `MAIN_BRANCH`: Main branch (typically `main`, but varies)
 *  `ENDPOINT`: API endpoint of the repository manager (e.g., `https://api.github.com` for GitHub)
 *  `MODE`: Repository manager mode (`github`, `gitlab` or `azure` only)
-*  `PROJECT`: Only relevant for Azure, represents the project name (not the repository!); can be left empty for other MODEs
+*  `PROJECT`: Value differs depending on the repository manager:
+** _Github_ and _Gitlab_: Not relevant, can be left empty
+** _Azure_: the project name (not the repository!)
+** _Bitbucket_: the project key, can be found in the URL of your project: `https://my-bitbucket.com/projects/{PROJECT KEY}/repos/{REPOSITORY NAME}/browse`
+
 
 WARNING: Without the variables, the data retrieval will not work.
 
