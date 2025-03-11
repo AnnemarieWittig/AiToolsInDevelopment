@@ -366,6 +366,36 @@ def retrieve_issue_timeline(owner, repo, access_token, issue_number):
     timeline = retrieve_via_url(owner, repo, access_token, ISSUE_TIMELINE.format(issue_number=issue_number), paginate=True)
     return timeline
 
+def retrieve_pull_requests_bitbucket(project, repo, access_token, endpoint):
+    """
+    Retrieve all pull requests from Bitbucket using API.
+
+    :param project: Bitbucket project name.
+    :type project: str
+    :param repo: Bitbucket repository name.
+    :type repo: str
+    :param access_token: Bitbucket API token.
+    :type access_token: str
+    :param endpoint: Bitbucket API base URL.
+    :type endpoint: str
+    :return: List of pull requests.
+    :rtype: list
+    """
+    url = f"{endpoint}/rest/api/1.0/projects/{project}/repos/{repo}/pull-requests?state=ALL&limit=100"
+    parameters = {
+        "state": "ALL"
+    }
+    
+    pull_requests = retrieve_via_url(project, repo, access_token, endpoint, parameters=parameters, endpoint=URL_ENDING_PULLS_BITBUCKET)
+
+    # response = requests.get(url, headers=headers)
+    # response.raise_for_status()
+    
+    # pull_requests = response.json().get("values", [])
+    
+    return [{"number": pr["id"], "state": pr["state"]} for pr in pull_requests]  # Extract PR ID & state
+
+
 def retrieve_pull_request_details(owner, repo, access_token, pr_number, endpoint, mode):
     """
     Retrieve details of a specific pull request from a GitHub repository.
