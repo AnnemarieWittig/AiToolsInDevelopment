@@ -141,7 +141,16 @@ def get_azure_run_values(pipelines):
     for countvalue in pipelines:
         for value in countvalue['value']:
             name = value["name"]
-            runs = retrieve_via_url(OWNER,PROJECT,ACCESS_TOKEN, ending=f"pipelines/{value["id"]}/runs", endpoint=ENDPOINT, mode=MODE)
+            if  "id" in value:
+                try:
+                    runs = retrieve_via_url(OWNER,PROJECT,ACCESS_TOKEN, ending=f"pipelines/{value["id"]}/runs", endpoint=ENDPOINT, mode=MODE)
+                except SyntaxError as se:
+                    logging.warning(f"Syntax error with value id {value['id']}: {se}")
+                except Exception as e:
+                    logging.warning(f"Error retrieving runs for value id {value['id']}: {e}")
+            else:
+                logging.warning(f"No run ID in value {value} in {pipelines}")
+                runs = None
             if type(runs) != list:
                 runs = [runs["value"]]
             for runcountvalue in runs:
