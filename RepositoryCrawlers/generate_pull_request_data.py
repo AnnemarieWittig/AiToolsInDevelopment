@@ -4,7 +4,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from helper.git_console_access import run_git_command, retrieve_pull_requests_parallel, retrieve_pr_metadata_via_ls_remote
 from helper.general_purpose import transform_time, substract_and_format_time, get_user_name_azure
-from helper.api_access import retrieve_pull_request_details, retrieve_pull_requests_gitlab, retrieve_pull_requests_azure
+from helper.api_access import retrieve_pull_request_details, retrieve_pull_requests_gitlab, retrieve_pull_requests_azure, retrieve_pull_requests_bitbucket
 from helper.anonymizer import replace_all_user_occurences
 import logging
 import requests
@@ -23,31 +23,6 @@ BOT_USERS = ['dependabot-preview[bot]', 'dependabot[bot]', 'renovate[bot]']
 ENDPOINT = os.getenv('ENDPOINT')
 MODE = os.getenv('MODE')
 storage_path = os.getenv('STORAGE_PATH') + '/pull_requests.json'
-
-def retrieve_pull_requests_bitbucket(project, repo, access_token, endpoint):
-    """
-    Retrieve all pull requests from Bitbucket using API.
-
-    :param project: Bitbucket project name.
-    :type project: str
-    :param repo: Bitbucket repository name.
-    :type repo: str
-    :param access_token: Bitbucket API token.
-    :type access_token: str
-    :param endpoint: Bitbucket API base URL.
-    :type endpoint: str
-    :return: List of pull requests.
-    :rtype: list
-    """
-    url = f"{endpoint}/rest/api/1.0/projects/{project}/repos/{repo}/pull-requests?state=ALL&limit=100"
-    headers = {"Authorization": f"Bearer {access_token}"}
-
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    
-    pull_requests = response.json().get("values", [])
-    
-    return [{"number": pr["id"], "state": pr["state"]} for pr in pull_requests]  # Extract PR ID & state
 
 def get_pr_detail_github(owner, repo, access_token, pr_number, endpoint):
     pr_details = retrieve_pull_request_details(owner, repo, access_token, pr_number, endpoint, MODE)
@@ -95,8 +70,10 @@ def get_pr_detail_bitbucket(project, repo, access_token, pr_number, endpoint):
     """
     # Fetch PR details
     pr_details = retrieve_pull_request_details(project, repo, access_token, pr_number, endpoint, MODE)
-    if not pr_details:
+    if not pr_details or len(pr_details) == 0:
         return None
+
+    pr_details = pr_details[0]
 
     return {
         'merge_id': pr_details["id"],
@@ -189,14 +166,14 @@ elif MODE == "azure":
         pr.extend(group["value"])
     pull_requests = pr
 elif MODE == "bitbucket":
-    pull_requests = retrieve_pull_requests_bitbucket(PROJECT, REPO,ACCESS_TOKEN,ENDPOINT)
+    pull_requests = retrieve_pull_requests_bitbucket(PROJECT, REPO, ACCESS_TOKEN, ENDPOINT)
 else:
     raise ValueError(f"No settings for pr retrieval for mode {MODE}")
 
 logging.info(f'Found {len(pull_requests)} pull requests')
 # Safety Storage
-# with open(storage_path, 'w') as file:
-#     json.dump(pull_requests, file)
+with open(storage_path, 'w') as file:
+    json.dump(pull_requests, file)
 results = []
 counter = 0
 
@@ -209,6 +186,10 @@ for pull_request in pull_requests:
         pr_details = get_pr_detail_azure(pull_request)
     elif MODE == 'bitbucket':
         pr_details = get_pr_detail_bitbucket(PROJECT, REPO, ACCESS_TOKEN, pull_request['number'], ENDPOINT)
+        date_values = ['created_at', 'updated_at', 'closed_at', 'merged_at']
+        for date_value in date_values:
+            if pr_details.get(date_value):
+                pr_details[date_value] = str(datetime.utcfromtimestamp(pr_details[date_value] / 1000).isoformat())
     else:
         raise ValueError(f"No mode for pull request extraction: {MODE}")
     

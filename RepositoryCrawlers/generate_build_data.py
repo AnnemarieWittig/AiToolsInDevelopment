@@ -17,10 +17,17 @@ ENDPOINT = os.getenv('ENDPOINT')
 MODE = os.getenv('MODE')
 REPO_PATH = os.getenv('REPO_PATH')
 PROJECT = os.getenv('PROJECT')
-storage_path = os.getenv('STORAGE_PATH') + '/workflow_runs.csv'
+STORAGE_DIRECTORY = os.getenv('STORAGE_PATH')
+storage_path =  STORAGE_DIRECTORY + '/workflow_runs.csv'
+
+if MODE == "bitbucket":
+    commit_path = STORAGE_DIRECTORY + '/commits.csv'
+    commits = pd.read_csv(commit_path)
+    # Get sha column as list
+    workflow_runs = commits['sha'].tolist()
 
 # Get all runs
-if MODE == "azure":
+elif MODE == "azure":
     workflow_runs = retrieve_workflow_runs(OWNER, PROJECT, ACCESS_TOKEN, endpoint= ENDPOINT, mode=MODE)
 else:
     workflow_runs = retrieve_workflow_runs(OWNER, REPO, ACCESS_TOKEN, endpoint= ENDPOINT, mode=MODE)
@@ -164,7 +171,11 @@ def get_azure_run_values(pipelines):
                         }
                     )
     return results
-    
+
+def get_bitbucket_run_values (commit_sha):
+    ending = f"build-status/latest/commits/stats/{commit_sha}"
+    build_info = retrieve_via_url(OWNER,REPO,ACCESS_TOKEN, ending, endpoint=ENDPOINT)
+    return {"sha": commit_sha} | build_info
 
 if MODE == "azure" and workflow_runs != {} and workflow_runs != []:
     results = get_azure_run_values(workflow_runs)
@@ -185,6 +196,8 @@ else:
         
         if MODE == "github":
             results.append(get_github_run_values(run))
+        elif MODE == "bitbucket":
+            results.append(get_bitbucket_run_values(run))
         elif MODE == "gitlab":
             results.append(get_gitlab_run_values(run))
     

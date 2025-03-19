@@ -8,7 +8,6 @@ import concurrent.futures
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
@@ -138,7 +137,10 @@ def construct_url(mode, endpoint, owner, repo, ending):
     elif mode == 'azure':
         return f'{endpoint}/{owner}/{repo}/_apis/{ending}'
     elif mode == 'bitbucket':
-        return f'{endpoint}/rest/api/1.0/projects/{owner}/repos/{repo}/{ending}'
+        if 'build_status' in ending:
+            return f'{endpoint}/rest/{ending}'
+        else:
+            return f'{endpoint}/rest/api/1.0/projects/{owner}/repos/{repo}/{ending}'
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
@@ -173,7 +175,6 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
                         parameters["page"] = next_page
                     elif (mode == "bitbucket") and next_page:
                         parameters["start"] = next_page
-                    logging.debug(parameters)
                     response = requests.get(url, headers=headers, params=parameters)
                     response.raise_for_status()
                     break
@@ -194,8 +195,10 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
                 if mode == "bitbucket":
                     if "values" in result:
                         all_results.extend(result["values"])
+                    elif result == None:
+                        logging.debug("Bitbucket response did not contain a result. Check API response format.")
                     else:
-                        logging.debug("Bitbucket response did not contain 'values'. Check API response format.")
+                        all_results.append(result)
                 else:
                     all_results.extend(result if isinstance(result, list) else [result])
             else:
@@ -213,6 +216,10 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
                     logging.info(f"Page {current_page} of {total_pages} checked.")
                 else:
                     logging.info(f"Page {current_page} checked.")
+                    
+                if current_page % 10 == 0:
+                    with open('tmp.json', 'w') as tmp_file:
+                        json.dump(all_results, tmp_file, indent=4)
 
             current_page += 1
             if max_pages and current_page == max_pages:
@@ -385,8 +392,7 @@ def retrieve_pull_requests_bitbucket(project, repo, access_token, endpoint):
     parameters = {
         "state": "ALL"
     }
-    
-    pull_requests = retrieve_via_url(project, repo, access_token, endpoint, parameters=parameters, endpoint=URL_ENDING_PULLS_BITBUCKET)
+    pull_requests = retrieve_via_url(owner=project, repo=repo, access_token=access_token, endpoint=endpoint, parameters=parameters, ending=URL_ENDING_PULLS_BITBUCKET, mode="bitbucket")
 
     # response = requests.get(url, headers=headers)
     # response.raise_for_status()
