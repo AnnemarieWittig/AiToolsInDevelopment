@@ -1173,8 +1173,8 @@ def retrieve_releases(repo_path):
     :return: A list of dictionaries containing release information.
     :rtype: list
     """
-    fetch_args = ["fetch", "--tags"]
-    run_git_command(fetch_args, repo_path=repo_path)
+    # fetch_args = ["fetch", "--tags"]
+    # run_git_command(fetch_args, repo_path=repo_path)
 
     tags_args = ["tag"]
     tags_output = run_git_command(tags_args, repo_path=repo_path)

@@ -45,7 +45,7 @@ To execute scripts the scripts automatically, ensure the following prerequisites
 
 * *List with the repositories* (as detailed below)
 * **Internet connection** (for API access)
-* **Locally cloned repositories**
+* **Locally cloned repositories** - All repositories need to be available locally. We recommend to separaetely run `git fetch --tags` in every repository.
 * **Usage of Python virtualenv** as it is used to automatically create the environment and install the dependencies.
 
 Then, you follow these steps:
