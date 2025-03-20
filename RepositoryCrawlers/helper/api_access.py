@@ -137,7 +137,7 @@ def construct_url(mode, endpoint, owner, repo, ending):
     elif mode == 'azure':
         return f'{endpoint}/{owner}/{repo}/_apis/{ending}'
     elif mode == 'bitbucket':
-        if 'build_status' in ending:
+        if 'build-status' in ending:
             return f'{endpoint}/rest/{ending}'
         else:
             return f'{endpoint}/rest/api/1.0/projects/{owner}/repos/{repo}/{ending}'

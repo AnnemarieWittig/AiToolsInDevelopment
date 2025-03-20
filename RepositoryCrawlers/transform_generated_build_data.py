@@ -107,6 +107,6 @@ with open(json_file_path, "r", encoding="utf-8") as file:
 # Store in CSV
 logging.info(f'Total processed workflow runs: {counter}')
 df = pd.DataFrame(results)
-if len (df) > 1:
-    df = replace_all_user_occurences(df, REPO_PATH)
+#if len(df) > 0:
+#    df = replace_all_user_occurences(df, REPO_PATH)
 df.to_csv(storage_path, index=False)

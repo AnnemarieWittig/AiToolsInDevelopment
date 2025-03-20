@@ -174,7 +174,7 @@ def get_azure_run_values(pipelines):
 
 def get_bitbucket_run_values (commit_sha):
     ending = f"build-status/latest/commits/stats/{commit_sha}"
-    build_info = retrieve_via_url(OWNER,REPO,ACCESS_TOKEN, ending, endpoint=ENDPOINT)
+    build_info = retrieve_via_url(PROJECT,REPO,ACCESS_TOKEN, ending, endpoint=ENDPOINT, mode=MODE, paginate=False)
     return {"sha": commit_sha} | build_info
 
 if MODE == "azure" and workflow_runs != {} and workflow_runs != []:
@@ -189,21 +189,21 @@ else:
         
         if not run:
             continue
-        
-        if "created_at" not in run:
+
+        if MODE == "bitbucket":
+            results.append(get_bitbucket_run_values(run))
+        elif "created_at" not in run:
             logging.debug('Run does not contain "created_at" field: %s', run)
-            continue
+            continue 
         
         if MODE == "github":
             results.append(get_github_run_values(run))
-        elif MODE == "bitbucket":
-            results.append(get_bitbucket_run_values(run))
         elif MODE == "gitlab":
             results.append(get_gitlab_run_values(run))
     
 # Store
 df = pd.DataFrame(results)
-if len(df) > 0:
-    df = replace_all_user_occurences(df, repo_path=REPO_PATH)
+#if len(df) > 0:
+#    df = replace_all_user_occurences(df, repo_path=REPO_PATH)
     
 df.to_csv(storage_path, index=False)

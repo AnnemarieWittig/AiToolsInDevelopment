@@ -44,6 +44,7 @@ Get-Content $INPUT_FILE | ForEach-Object {
 
     # Write values to the .env file inside the repo folder
     @"
+DUMMY_VALUE=aDummyBecauseTheFirstLineIsNotRead
 ACCESS_TOKEN=$access_token
 REPO_PATH=$repo_path
 STORAGE_PATH=$STORAGE_FOLDER

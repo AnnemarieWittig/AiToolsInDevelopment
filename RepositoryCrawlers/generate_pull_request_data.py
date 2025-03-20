@@ -172,8 +172,8 @@ else:
 
 logging.info(f'Found {len(pull_requests)} pull requests')
 # Safety Storage
-with open(storage_path, 'w') as file:
-    json.dump(pull_requests, file)
+# with open(storage_path, 'w') as file:
+#    json.dump(pull_requests, file)
 results = []
 counter = 0
 
@@ -223,7 +223,7 @@ for pull_request in pull_requests:
 # Store
 df = pd.DataFrame(results)
 
-if len(df) > 0:
-    df = replace_all_user_occurences(df, REPO_PATH)
+#if len(df) > 0:
+#    df = replace_all_user_occurences(df, REPO_PATH)
     
 df.to_csv(storage_path.replace('.json', '.csv'), index=False)

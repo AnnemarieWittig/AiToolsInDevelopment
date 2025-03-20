@@ -2,3 +2,10 @@
 venv/
 __pycache__/
 ex_answer_objects
+mapping*.json
+tmp.json
+store*
+/*.csv
+partial_results.json
+token
+users.txt

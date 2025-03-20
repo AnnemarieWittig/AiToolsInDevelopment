@@ -755,7 +755,6 @@ def format_fast_forwarded_branch(branch):
             'branch_name': branch,
             'commits' : None,
             'created_at' : None,
-            'created_by_username' : None,
             'created_by' : None,
             'first_commit_sha' : None,
             'last_active' : None,
@@ -795,7 +794,7 @@ def retrieve_branch_data_new(repo_path = ".", main_branch="main", path_to_enviro
     branch_args = ["branch", "--all", "--merged"]
     merged = run_git_command(branch_args, None, repo_path)
     merged_split = merged.splitlines()
-    logging.info(f"Retrieved {len(merged_split)} unmerged branches.")
+    logging.info(f"Retrieved {len(merged_split)} merged branches.")
     
     for branch_name in merged_split:
         branch_name = clear_branch_name(branch_name)
@@ -1173,8 +1172,8 @@ def retrieve_releases(repo_path):
     :return: A list of dictionaries containing release information.
     :rtype: list
     """
-    fetch_args = ["fetch", "--tags"]
-    run_git_command(fetch_args, repo_path=repo_path)
+    #fetch_args = ["fetch", "--tags"]
+    #run_git_command(fetch_args, repo_path=repo_path)
 
     tags_args = ["tag"]
     tags_output = run_git_command(tags_args, repo_path=repo_path)
