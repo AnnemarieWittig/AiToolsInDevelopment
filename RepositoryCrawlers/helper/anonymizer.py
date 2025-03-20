@@ -92,11 +92,11 @@ def replace_all_user_occurences(df, repo_path, use_custom_mapping=False, filter_
     if use_custom_mapping:
         manual_users_mapping, users_mapping = overwrite_automated_mapping(users_mapping)
 
-        if filter_columns:
-            # Filter rows where at least one of the cell values in filter_columns is a key in manual_users_mapping
-            df = df[df[filter_columns].apply(
-                lambda row: any(cell in manual_users_mapping for cell in row if isinstance(cell, str)), axis=1
-            )]
+    if filter_columns:
+        # Filter rows where at least one of the cell values in filter_columns contains a substring that is a key in manual_users_mapping
+        df = df[df[filter_columns].apply(
+            lambda row: any(any(key in cell for key in manual_users_mapping) for cell in row if isinstance(cell, str)), axis=1
+        )]
 
         df = replace_user_data(df, manual_users_mapping)
 
