@@ -10,6 +10,7 @@ load_dotenv(override=True)
 repo_list = 'done.csv'
 input_path = 'store'
 output_path = 'store-anon'
+mode = 'MAC'
 
 filter_columns = {
     'branches.csv': ['created_by', 'last_author'],
@@ -20,7 +21,10 @@ filter_columns = {
 
 # Read the repo list
 repo_df = pd.read_csv(repo_list)
-repo_mapping = {f"{row['STORAGE_PATH']}\\{row['REPO']}".replace(".\\", ""): row['REPO_PATH'] for index, row in repo_df.iterrows()}
+if mode == 'WINDOWS':
+    repo_mapping = {f"{row['STORAGE_PATH']}\\{row['REPO']}".replace(".\\", ""): row['REPO_PATH'] for index, row in repo_df.iterrows()}
+elif mode == 'MAC':
+    repo_mapping = {f"{row['STORAGE_PATH']}/{row['REPO']}": row['REPO_PATH'] for index, row in repo_df.iterrows()}
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -48,7 +52,7 @@ def anonymize_files(input_path, output_path, filter_columns, repo_mapping):
 
             # Determine the corresponding repo path
             storage_path = os.path.commonpath([input_path, root])
-            repo_path = repo_mapping.get(root, None)
+            repo_path = repo_mapping.get(f"./{root}", None)
             
             if not repo_path:
                 logging.warning(f'No REPO_PATH found for {storage_path}, skipping file {file_path}')
@@ -63,7 +67,7 @@ def anonymize_files(input_path, output_path, filter_columns, repo_mapping):
                     log_unique_values(df, filter_columns[file_name])
                     
                     # Anonymize the data
-                    df = replace_all_user_occurences(df, repo_path=repo_path, use_custom_mapping=True, filter_columns=filter_columns[file_name])
+                    df = replace_all_user_occurences(df, repo_path=repo_path, use_custom_mapping=True, filter_columns=None)
                     
                     # Save the anonymized data to the output path
                     df.to_csv(output_file_path, index=False)
