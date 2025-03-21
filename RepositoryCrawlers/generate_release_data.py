@@ -30,7 +30,7 @@ for release in releases:
 
 # Store
 df = pd.DataFrame(results)
-#if len(df) > 0:
-#    df = replace_all_user_occurences(df, REPO_PATH, use_custom_mapping=True, filter_columns=['author'])
+if len(df) > 0:
+    df = replace_all_user_occurences(df, REPO_PATH, use_custom_mapping=True, filter_columns=['author'])
     
 df.to_csv(storage_path, index=False)

@@ -19,7 +19,7 @@ df = pd.DataFrame(commit_list)
 #    df = replace_all_user_occurences(df,REPO_PATH)
     
 # Create Storage path if not existent, store as csv
-#if not os.path.exists(STORAGE_PATH):
-#    os.makedirs(STORAGE_PATH)
+if not os.path.exists(STORAGE_PATH):
+    os.makedirs(STORAGE_PATH)
     
 df.to_csv(store_path, index=False)

@@ -98,7 +98,7 @@ def replace_all_user_occurences(df, repo_path, use_custom_mapping=False, filter_
                 lambda row: any(any(key in cell for key in manual_users_mapping) for cell in row if isinstance(cell, str)), axis=1
             )]
 
-            df = replace_user_data(df, manual_users_mapping)
+        df = replace_user_data(df, manual_users_mapping)
 
     df = replace_user_data(df, users_mapping)
     

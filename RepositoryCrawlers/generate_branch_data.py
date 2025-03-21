@@ -18,7 +18,7 @@ branches = retrieve_branch_data_new(repo_path=REPO_PATH, main_branch=MAIN_BRANCH
 
 # Store
 df = pd.DataFrame(branches)
-#if len(df) > 0:
-#    df = replace_all_user_occurences(df, REPO_PATH)
+if len(df) > 0:
+    df = replace_all_user_occurences(df, REPO_PATH)
     
 df.to_csv(storage_path, index=False)
