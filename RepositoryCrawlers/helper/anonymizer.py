@@ -2,7 +2,18 @@ import re
 from .general_purpose import hash_string_sha256
 from .git_console_access import run_git_command
 
-
+def format_username(name):
+    """
+    Format the username by taking the first letter of the first word and the rest of the last word,
+    all in lowercase, with spaces removed.
+    Example: "Mario Mauer" -> "mmauer"
+    """
+    parts = name.split()
+    if len(parts) > 1:
+        formatted_name = parts[0][0].lower() + parts[-1].lower()
+    else:
+        formatted_name = name.lower()
+    return formatted_name
 
 def get_local_git_users(repo_path=None):
     """
@@ -18,8 +29,10 @@ def get_local_git_users(repo_path=None):
             if "<" in line and ">" in line:
                 name, email = line.rsplit(" <", 1)
                 email = email.rstrip(">")
+                formatted_name = format_username(name)  
                 hashed_email = hash_string_sha256(email)
-                users[name] = hashed_email  # Store hashed email by username
+                users[formatted_name] = hashed_email  
+                users[name] = hashed_email  
                 users[email] = hashed_email
 
     return users
@@ -36,7 +49,7 @@ def replace_user_data(df, users_mapping):
 
     for username, hashed_email in users_mapping.items():
         pattern = rf"\b{re.escape(username)}\b"
-        df_copy = df_copy.map(lambda x: re.sub(pattern, hashed_email, x) if isinstance(x, str) else x)
+        df_copy = df_copy.map(lambda x: re.sub(pattern, hashed_email, x, flags=re.IGNORECASE) if isinstance(x, str) else x)
 
     return df_copy
 

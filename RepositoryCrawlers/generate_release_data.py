@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+import logging
 import pandas as pd
 from dotenv import load_dotenv
 from helper.git_console_access import retrieve_releases
@@ -9,6 +9,7 @@ load_dotenv(override=True)
 
 # Setup
 REPO_PATH = os.getenv('REPO_PATH')
+REPO = os.getenv('REPO')
 storage_path = os.getenv('STORAGE_PATH') + '/releases.csv'
 
 # Retrieve and format Releases
@@ -33,4 +34,6 @@ df = pd.DataFrame(results)
 if len(df)>1:
     df = replace_all_user_occurences(df, REPO_PATH)
     
-df.to_csv(storage_path, index=False)
+    df.to_csv(storage_path, index=False)
+else:
+    logging.warning(f"No releases found for {REPO}.")

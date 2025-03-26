@@ -196,10 +196,12 @@ else:
             results.append(get_github_run_values(run))
         elif MODE == "gitlab":
             results.append(get_gitlab_run_values(run))
-    
+
 # Store
 df = pd.DataFrame(results)
 if len(df) > 0:
     df = replace_all_user_occurences(df, repo_path=REPO_PATH)
     
-df.to_csv(storage_path, index=False)
+    df.to_csv(storage_path, index=False)
+else:
+    logging.warning(f"No Builds/Workflows found for {REPO}.")
