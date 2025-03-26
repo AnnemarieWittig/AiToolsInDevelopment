@@ -531,7 +531,7 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
             #   3: date
             #   4: message
             #   5: parents
-            if len(parts) < 5:
+            if len(parts) < 6:
                 continue
 
             sha = parts[1]
