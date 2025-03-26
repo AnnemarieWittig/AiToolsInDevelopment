@@ -46,7 +46,7 @@ To execute scripts the scripts automatically, ensure the following prerequisites
 * *List with the repositories* (as detailed below)
 * **Internet connection** (for API access)
 * **Locally cloned repositories**
-* **The python package** `virtualenv` as it is used to automatically create the environment and install the dependencies (check via `python -m venv --help`, install with `pip install virtualenv`). _This is usually installed by default._
+* **The python package** `virtualenv` as it is used to automatically create the environment and install the dependencies (check via `python -m venv --help`, install with `pip` or another package manager of your choice). _This is often installed by default._
 ** If you do not want to use python virtualenv, the automatic scripts need to be adjusted accordingly.
 
 Then, you follow these steps:
