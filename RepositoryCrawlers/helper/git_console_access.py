@@ -523,7 +523,7 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
                 detailed_commits.append(current_commit)
 
             # Parse commit metadata: COMMIT|<sha>|<author>|<date>|<message>|<parents...>
-            parts = line.split("|", 7)
+            parts = line.split("|")
             # Make sure we have at least 6 parts:
             #   0: "COMMIT"
             #   1: sha
@@ -539,6 +539,11 @@ def retrieve_all_commits_with_stats_and_logging(repo_path="."):
             date_str = parts[3]
             message = parts[4]
             parent_shas = parts[5].split() if parts[5] else []
+            
+            # Explicit check here:
+            if len(sha) != 40 or not all(c in "0123456789abcdef" for c in sha.lower()):
+                logging.warning(f"Invalid commit SHA detected: '{sha}' in line: {line}")
+                continue
 
             current_commit = {
                 "sha": sha,
