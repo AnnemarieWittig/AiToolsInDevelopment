@@ -1,6 +1,8 @@
 import re
 from .general_purpose import hash_string_sha256
 from .git_console_access import run_git_command
+import pandas as pd
+import json
 
 def format_username(name):
     """
@@ -23,9 +25,10 @@ def get_local_git_users(repo_path=None):
 
     # Get all unique commit authors and their emails
     git_output = run_git_command(['log', '--format=%aN <%aE>', '--all'], repo_path=repo_path)
+    git_output = sorted(set(git_output.splitlines()), key=str.casefold)  # Remove duplicates and sort
 
     if git_output:
-        for line in git_output.split("\n"):
+        for line in git_output:  # Ensure no duplicate lines are processed
             if "<" in line and ">" in line:
                 name, email = line.rsplit(" <", 1)
                 email = email.rstrip(">")
@@ -34,24 +37,30 @@ def get_local_git_users(repo_path=None):
                 users[formatted_name] = hashed_email  
                 users[name] = hashed_email  
                 users[email] = hashed_email
+                mail_prefix = email.split('@')[0]
+                users[mail_prefix] = hashed_email
 
     return users
 
 def replace_user_data(df, users_mapping):
-    """
-    Replace occurrences of usernames and emails in the dataframe with the corresponding hashed email.
-
-    :param df: Pandas DataFrame containing data to replace.
-    :param users_mapping: Dictionary {username: hashed_email}.
-    :return: Modified DataFrame.
-    """
     df_copy = df.copy()
 
-    for username, hashed_email in users_mapping.items():
-        pattern = rf"\b{re.escape(username)}\b"
-        df_copy = df_copy.map(lambda x: re.sub(pattern, hashed_email, x, flags=re.IGNORECASE) if isinstance(x, str) else x)
+    ci_mapping = {k.lower(): v for k, v in users_mapping.items()}
+    sorted_usernames = sorted(users_mapping.keys(), key=len, reverse=True)
+    pattern = r'\b(' + '|'.join(re.escape(user) for user in sorted_usernames) + r')\b'
+
+    def replacer(match):
+        matched_text = match.group(0)
+        return ci_mapping.get(matched_text.lower(), matched_text)
+
+    str_cols = df_copy.select_dtypes(include='object')
+    df_copy[str_cols.columns] = str_cols.map(
+        lambda x: re.sub(pattern, replacer, x, flags=re.IGNORECASE) if isinstance(x, str) else x
+    )
 
     return df_copy
+
+
 
 def replace_user_data_in_dict(data_dict, users_mapping):
     """
@@ -76,6 +85,27 @@ def replace_user_data_in_dict(data_dict, users_mapping):
 
 def replace_all_user_occurences(df, repo_path):
     users_mapping = get_local_git_users(repo_path)
+
+    # with open('mapping.json', 'w') as f:
+    #     json.dump(users_mapping, f, indent=4)
+
     df = replace_user_data(df, users_mapping)
     
     return df
+
+def anonymize_csv(input_path, output_path, repo_path):
+    """
+    Anonymize a CSV file by replacing user data with hashed values.
+
+    :param input_path: Path to the input CSV file.
+    :param output_path: Path to save the anonymized CSV file.
+    :param repo_path: Path to the Git repository for extracting user data.
+    """
+    # Read the CSV file into a DataFrame
+    df = pd.read_csv(input_path)
+
+    # Apply the anonymization process
+    anonymized_df = replace_all_user_occurences(df, repo_path)
+
+    # Save the anonymized DataFrame to the output path
+    anonymized_df.to_csv(output_path, index=False)
