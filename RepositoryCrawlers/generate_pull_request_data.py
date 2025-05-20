@@ -170,7 +170,7 @@ for pull_request in pull_requests:
 df = pd.DataFrame(results)
 
 if len(df) > 0:
-    df = replace_all_user_occurences(df, REPO_PATH)
+    # df = replace_all_user_occurences(df, REPO_PATH)
     
     df.to_csv(storage_path.replace('.json', '.csv'), index=False)
 else:

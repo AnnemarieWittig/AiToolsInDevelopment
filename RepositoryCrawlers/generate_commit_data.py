@@ -18,7 +18,7 @@ commit_list = retrieve_all_commits_with_stats_and_logging(REPO_PATH)
 df = pd.DataFrame(commit_list)
 
 if len(df) > 0:
-    df = replace_all_user_occurences(df,REPO_PATH)
+    # df = replace_all_user_occurences(df,REPO_PATH)
     
     df.to_csv(store_path, index=False)
 else:

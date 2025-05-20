@@ -200,7 +200,7 @@ else:
 # Store
 df = pd.DataFrame(results)
 if len(df) > 0:
-    df = replace_all_user_occurences(df, repo_path=REPO_PATH)
+    # df = replace_all_user_occurences(df, repo_path=REPO_PATH)
     
     df.to_csv(storage_path, index=False)
 else:
