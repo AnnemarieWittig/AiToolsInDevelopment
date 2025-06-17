@@ -85,46 +85,46 @@ else:
 
 results = []
 counter = 0
+if issues:
+    length = len(issues)
 
-length = len(issues)
-
-# Format Issues
-for issue in issues:
-    counter += 1
-    if counter % 100 == 0:
-        logging.info(f"Processed {counter} of {length} issues")
-    if not issue or ('user' in issue and issue['user']['login'] in BOT_USERS):
-        continue
-    
-    if MODE == "azure":
-        created_at = transform_time(issue['fields']['System.CreatedDate'][:-1])
-        closed_at = None if issue['fields'].get('Microsoft.VSTS.Common.ClosedDate') is None else transform_time(issue['fields']['Microsoft.VSTS.Common.ClosedDate'][:-1])
-    else:
-        created_at = transform_time(issue['created_at'][:-1])
-        closed_at = None if issue['closed_at'] is None else transform_time(issue['closed_at'][:-1])
-    issue_id = issue['id']
-
-    # Calculate time until closed
-    time_until_closed = "N/A"
-    if closed_at:
-        time_until_closed = substract_and_format_time(created_at, closed_at)
-
-    if MODE == 'github':
-        formatted_issue = format_issue_for_github(issue, time_until_closed=time_until_closed)
-    elif MODE == 'gitlab':
-        formatted_issue = format_issue_for_gitlab(issue, time_until_closed)
-    elif MODE == 'azure':
-        formatted_issue = format_issue_for_azure(issue, time_until_closed)
-    else:
-        raise ValueError(f"Unsupported MODE for issue retrieval: {MODE}")
+    # Format Issues
+    for issue in issues:
+        counter += 1
+        if counter % 100 == 0:
+            logging.info(f"Processed {counter} of {length} issues")
+        if not issue or ('user' in issue and issue['user']['login'] in BOT_USERS):
+            continue
         
-    results.append(formatted_issue)
+        if MODE == "azure":
+            created_at = transform_time(issue['fields']['System.CreatedDate'][:-1])
+            closed_at = None if issue['fields'].get('Microsoft.VSTS.Common.ClosedDate') is None else transform_time(issue['fields']['Microsoft.VSTS.Common.ClosedDate'][:-1])
+        else:
+            created_at = transform_time(issue['created_at'][:-1])
+            closed_at = None if issue['closed_at'] is None else transform_time(issue['closed_at'][:-1])
+        issue_id = issue['id']
+
+        # Calculate time until closed
+        time_until_closed = "N/A"
+        if closed_at:
+            time_until_closed = substract_and_format_time(created_at, closed_at)
+
+        if MODE == 'github':
+            formatted_issue = format_issue_for_github(issue, time_until_closed=time_until_closed)
+        elif MODE == 'gitlab':
+            formatted_issue = format_issue_for_gitlab(issue, time_until_closed)
+        elif MODE == 'azure':
+            formatted_issue = format_issue_for_azure(issue, time_until_closed)
+        else:
+            raise ValueError(f"Unsupported MODE for issue retrieval: {MODE}")
+            
+        results.append(formatted_issue)
 
 # Store
 df = pd.DataFrame(results)
 
 if (len(df) > 1):
-    df = replace_all_user_occurences(df, REPO_PATH)
+    # # df = replace_all_user_occurences(df, REPO_PATH)
     
     df.to_csv(STORAGE_PATH + '/issues.csv', index=False)
 else:

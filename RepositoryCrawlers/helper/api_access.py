@@ -163,17 +163,25 @@ def retrieve_via_url(owner, repo, access_token, ending, parameters={}, paginate=
                     response = requests.get(url, headers=headers, params=parameters)
                     response.raise_for_status()
                     break
+                except requests.exceptions.ChunkedEncodingError as e:
+                    logging.error(f"Chunked encoding error: {e}. Retrying...")
+                    wait_time = backoff_factor * (2 ** attempt)
+                    time.sleep(wait_time)
                 except requests.exceptions.RequestException as e:
                     if response.status_code in {502, 503, 504}:
                         wait_time = backoff_factor * (2 ** attempt)
                         logging.debug(f"Error {response.status_code}. Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
+                    elif response.status_code == 422:
+                        logging.error(f"Request failed: {e}. Returning results until this page due to 422 Unprocessable Entity.")
+                        return all_results
                     else:
                         logging.error(f"Request failed: {e}")
                         raise
             else:
                 logging.error(f"Max retries exceeded for URL: {url}")
-                raise Exception(f"Failed to retrieve data after {max_retries} attempts.")
+                logging.exception(f"Failed to retrieve data after {max_retries} attempts.")
+                return None
 
             result = response.json()
             if paginate:
@@ -392,6 +400,13 @@ def retrieve_issues_parallel(owner, repo, access_token, endpoint, mode):
     
     :return: A list of all issues from the repository.
     """
+    issues = None
+    if mode == "github" or mode=="gitlab":
+        issues = retrieve_via_url(owner, repo, access_token, URL_ENDING_ISSUES, mode=mode, endpoint=endpoint)
+    elif mode == "azure":
+        return retrieve_issues_parallel_azure(owner, repo, access_token, endpoint)
+    
+    return issues
 
     # Determine API URL and headers based on mode
     if mode == "github":
@@ -421,7 +436,7 @@ def retrieve_issues_parallel(owner, repo, access_token, endpoint, mode):
     # Use pagination function to extract next page & total pages
     next_page, total_pages = get_pagination_headers(response, mode)
 
-    if not total_pages:
+    if not total_pages and not next_page:
         logging.info("Only one page of issues returned. No pagination detected.")
         return first_page_data
 

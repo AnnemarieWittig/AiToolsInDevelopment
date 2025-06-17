@@ -1,4 +1,4 @@
-import os, json
+import os, time
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
@@ -7,6 +7,7 @@ from helper.general_purpose import transform_time, substract_and_format_time, ge
 from helper.api_access import retrieve_pull_request_details, retrieve_pull_requests_gitlab, retrieve_pull_requests_azure
 from helper.anonymizer import replace_all_user_occurences
 import logging
+import json
 
 logging.basicConfig(level=logging.INFO)
 
@@ -108,36 +109,48 @@ def calculate_till_first_comment(pr_number, created_at, repo_path, skip_comments
     else:
         return None
 
-# Retrieve Pull Request
-if MODE == "gitlab":
-    pull_requests = retrieve_pull_requests_gitlab(OWNER, ACCESS_TOKEN, ENDPOINT)
-elif MODE == "github":
-    pull_requests = retrieve_pull_requests_parallel(REPO_PATH)
-elif MODE == "azure":
-    pull_requests = retrieve_pull_requests_azure(OWNER, PROJECT, REPO, ACCESS_TOKEN, ENDPOINT)
-    pr = []
-    for group in pull_requests:
-        pr.extend(group["value"])
-    pull_requests = pr
+if os.path.exists(storage_path):
+    with open(storage_path, 'r') as file:
+        pull_requests = json.load(file)
 else:
-    raise ValueError(f"No settings for pr retrieval for mode {MODE}")
+    # Retrieve Pull Request
+    if MODE == "gitlab":
+        pull_requests = retrieve_pull_requests_gitlab(OWNER, ACCESS_TOKEN, ENDPOINT)
+    elif MODE == "github":
+        pull_requests = retrieve_pull_requests_parallel(REPO_PATH)
+    elif MODE == "azure":
+        pull_requests = retrieve_pull_requests_azure(OWNER, PROJECT, REPO, ACCESS_TOKEN, ENDPOINT)
+        pr = []
+        for group in pull_requests:
+            pr.extend(group["value"])
+        pull_requests = pr
+    else:
+        raise ValueError(f"No settings for pr retrieval for mode {MODE}")
+    
+    with open(storage_path, 'w') as file:
+        json.dump(pull_requests, file)
 
-logging.info(f'Found {len(pull_requests)} pull requests')
 # Safety Storage
-# with open(storage_path, 'w') as file:
-#     json.dump(pull_requests, file)
 results = []
 counter = 0
+logging.info(f'Found {len(pull_requests)} pull requests')
 
 for pull_request in pull_requests:
-    if MODE == 'github':
-        pr_details = get_pr_detail_github(OWNER, REPO, ACCESS_TOKEN, pull_request['number'], ENDPOINT)
-    elif MODE == 'gitlab':
-        pr_details = get_pr_detail_gitlab(pull_request)
-    elif MODE == 'azure':
-        pr_details = get_pr_detail_azure(pull_request)
-    else:
-        raise ValueError(f"No mode for pull request extraction: {MODE}")
+    if counter < 37900:
+        counter+= 1
+        continue
+    try:
+        if MODE == 'github':
+            pr_details = get_pr_detail_github(OWNER, REPO, ACCESS_TOKEN, pull_request['number'], ENDPOINT)
+        elif MODE == 'gitlab':
+            pr_details = get_pr_detail_gitlab(pull_request)
+        elif MODE == 'azure':
+            pr_details = get_pr_detail_azure(pull_request)
+        else:
+            raise ValueError(f"No mode for pull request extraction: {MODE}")
+    except Exception as e:
+        logging.error(f"Error processing pull request {pull_request.get('number', 'unknown')}: {e}")
+        pr_details = None  # Ensure pr_details is set to None in case of an error
     
     if not pr_details:
         continue
@@ -165,12 +178,37 @@ for pull_request in pull_requests:
     counter+=1
     if counter % 100 == 0:
         logging.info(f"Processed {counter} of {len(pull_requests)} pull requests.")
+        with open (storage_path.replace('.json', '_intermediate5.json'), 'w') as f:
+            json.dump(results, f)
+    # if counter % 10000 == 0:
+    #     logging.info("Processed high numbers of pull requests. Sleeping 30 minutes to ensure API works.")
+    #     time.sleep(1800)
+
+import glob
+
+# Extend results with intermediate files
+for counter in range(-1, 100):  # Counter from 4 to 8
+    intermediate_file = storage_path.replace('.json', f'_intermediate{counter}.json')
+    if os.path.exists(intermediate_file):
+        logging.info(f"Loading intermediate file: {intermediate_file}")
+        with open(intermediate_file, 'r') as f:
+            try:
+                intermediate_results = json.load(f)
+                if isinstance(intermediate_results, list):
+                    results.extend(intermediate_results)
+                else:
+                    logging.warning(f"Intermediate file {intermediate_file} does not contain a list.")
+            except json.JSONDecodeError as e:
+                logging.error(f"Error decoding JSON from {intermediate_file}: {e}")
+
 
 # Store
 df = pd.DataFrame(results)
+df = df.astype(str)
+df = df.drop_duplicates()
 
 if len(df) > 0:
-    df = replace_all_user_occurences(df, REPO_PATH)
+    # # df = replace_all_user_occurences(df, REPO_PATH)
     
     df.to_csv(storage_path.replace('.json', '.csv'), index=False)
 else:
