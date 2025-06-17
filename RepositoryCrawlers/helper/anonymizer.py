@@ -45,20 +45,31 @@ def get_local_git_users(repo_path=None):
 def replace_user_data(df, users_mapping):
     df_copy = df.copy()
 
+    # Case-insensitive mapping: lowercase keys
     ci_mapping = {k.lower(): v for k, v in users_mapping.items()}
-    sorted_usernames = sorted(users_mapping.keys(), key=len, reverse=True)
-    pattern = r'\b(' + '|'.join(re.escape(user) for user in sorted_usernames) + r')\b'
 
+    # Sort usernames by length (longest first)
+    sorted_usernames = sorted(users_mapping.keys(), key=len, reverse=True)
+
+    # Compile regex with case-insensitive flag
+    pattern = r'\b(' + '|'.join(re.escape(user) for user in sorted_usernames) + r')\b'
+    regex = re.compile(pattern, flags=re.IGNORECASE)
+
+    # Replacement function using lowercase lookup
     def replacer(match):
         matched_text = match.group(0)
         return ci_mapping.get(matched_text.lower(), matched_text)
 
+    # Only apply to string-type columns
     str_cols = df_copy.select_dtypes(include='object')
+
+    # Apply replacement with precompiled regex
     df_copy[str_cols.columns] = str_cols.map(
-        lambda x: re.sub(pattern, replacer, x, flags=re.IGNORECASE) if isinstance(x, str) else x
+        lambda x: regex.sub(replacer, x) if isinstance(x, str) else x
     )
 
     return df_copy
+
 
 
 
