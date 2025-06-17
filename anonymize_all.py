@@ -22,7 +22,7 @@ anon_columns = {
     'branches.csv': ['created_by','last_author'],
     'commits.csv': ['author', 'message'],
     'pull_requests.csv':  ['author','merged_by','title','description','requested_reviewers','assignees'],
-    'releases.csv': ['author'],
+    'releases.csv': ['author', 'message'],
     'workflow_runs.csv': ['author', 'name'], 
 }
 
