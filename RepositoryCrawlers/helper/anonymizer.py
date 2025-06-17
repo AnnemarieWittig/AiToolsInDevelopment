@@ -70,7 +70,25 @@ def replace_user_data(df, users_mapping):
 
     return df_copy
 
+def replace_user_data_manual(df, users_mapping):
+    df_copy = df.copy()
 
+    # Sort usernames by length (longest first) for better replacement
+    sorted_usernames = sorted(users_mapping.keys(), key=len, reverse=True)
+
+    # Only apply to string-type columns
+    str_cols = df_copy.select_dtypes(include='object')
+
+    # For each string column, replace each username one by one (case-insensitive)
+    for col in str_cols.columns:
+        col_data = df_copy[col]
+        for username in sorted_usernames:
+            pattern = re.compile(rf'\b{re.escape(username)}\b', flags=re.IGNORECASE)
+            hashed_email = users_mapping[username]
+            col_data = col_data.map(lambda x: pattern.sub(hashed_email, x) if isinstance(x, str) else x)
+        df_copy[col] = col_data
+
+    return df_copy
 
 
 def replace_user_data_in_dict(data_dict, users_mapping):
