@@ -124,7 +124,7 @@ if issues:
 df = pd.DataFrame(results)
 
 if (len(df) > 1):
-    # # df = replace_all_user_occurences(df, REPO_PATH)
+    # df = replace_all_user_occurences(df, REPO_PATH)
     
     df.to_csv(STORAGE_PATH + '/issues.csv', index=False)
 else:
