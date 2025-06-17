@@ -3,7 +3,7 @@ import glob
 import shutil
 import pandas as pd
 from dotenv import load_dotenv
-from RepositoryCrawlers.helper.anonymizer import replace_user_data, get_local_git_users
+from RepositoryCrawlers.helper.anonymizer import replace_user_data_manual, get_local_git_users
 import json
 
 load_dotenv(override=True)
@@ -26,15 +26,19 @@ anon_columns = {
     'workflow_runs.csv': ['author', 'name'], 
 }
 
-users_mapping = get_local_git_users(REPO_PATH)
+mapping_file = os.path.join(STORAGE_PATH, 'mapping.json')
+print()
+if os.path.exists(mapping_file):
+    with open(mapping_file, 'r') as f:
+        users_mapping = json.load(f)
+    print(f"Loaded user mapping from {mapping_file}")
+else:
+    users_mapping = get_local_git_users(REPO_PATH)
+    os.makedirs(TARGET_PATH, exist_ok=True)
+    with open(mapping_file, 'w') as f:
+        json.dump(users_mapping, f, indent=2)
+    print(f"Saved user mapping to {mapping_file}")
 
-# Store user mapping at mapping.json
-
-mapping_path = 'mapping.json'
-os.makedirs(TARGET_PATH, exist_ok=True)
-with open(mapping_path, 'w') as f:
-    json.dump(users_mapping, f, indent=2)
-print(f"Saved user mapping to {mapping_path}")
 csv_files = glob.glob(os.path.join(STORAGE_PATH, '*.csv'))
 
 if not csv_files:
@@ -56,7 +60,7 @@ for csv_file in csv_files:
         print(f"Anonymizing {csv_file} ...")
         columns_to_anon = anon_columns[filename]
         # Only anonymize specified columns
-        df[columns_to_anon] = replace_user_data(df[columns_to_anon], users_mapping)
+        df[columns_to_anon] = replace_user_data_manual(df[columns_to_anon], users_mapping)
     else:
         print(f"{csv_file} is stored without anonymization because no options are given.")
         

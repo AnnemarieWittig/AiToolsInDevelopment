@@ -39,6 +39,9 @@ def get_local_git_users(repo_path=None):
                 users[email] = hashed_email
                 mail_prefix = email.split('@')[0]
                 users[mail_prefix] = hashed_email
+                
+        # Sort users by key length in descending order
+        users = dict(sorted(users.items(), key=lambda item: len(item[0]), reverse=True))
 
     return users
 
