@@ -136,9 +136,9 @@ counter = 0
 logging.info(f'Found {len(pull_requests)} pull requests')
 
 for pull_request in pull_requests:
-    if counter < 37900:
-        counter+= 1
-        continue
+    # if counter < 37900:
+    #     counter+= 1
+    #     continue
     try:
         if MODE == 'github':
             pr_details = get_pr_detail_github(OWNER, REPO, ACCESS_TOKEN, pull_request['number'], ENDPOINT)
@@ -184,22 +184,22 @@ for pull_request in pull_requests:
     #     logging.info("Processed high numbers of pull requests. Sleeping 30 minutes to ensure API works.")
     #     time.sleep(1800)
 
-import glob
+# import glob
 
-# Extend results with intermediate files
-for counter in range(-1, 100):  # Counter from 4 to 8
-    intermediate_file = storage_path.replace('.json', f'_intermediate{counter}.json')
-    if os.path.exists(intermediate_file):
-        logging.info(f"Loading intermediate file: {intermediate_file}")
-        with open(intermediate_file, 'r') as f:
-            try:
-                intermediate_results = json.load(f)
-                if isinstance(intermediate_results, list):
-                    results.extend(intermediate_results)
-                else:
-                    logging.warning(f"Intermediate file {intermediate_file} does not contain a list.")
-            except json.JSONDecodeError as e:
-                logging.error(f"Error decoding JSON from {intermediate_file}: {e}")
+# # Extend results with intermediate files
+# for counter in range(-1, 100):  # Counter from 4 to 8
+#     intermediate_file = storage_path.replace('.json', f'_intermediate{counter}.json')
+#     if os.path.exists(intermediate_file):
+#         logging.info(f"Loading intermediate file: {intermediate_file}")
+#         with open(intermediate_file, 'r') as f:
+#             try:
+#                 intermediate_results = json.load(f)
+#                 if isinstance(intermediate_results, list):
+#                     results.extend(intermediate_results)
+#                 else:
+#                     logging.warning(f"Intermediate file {intermediate_file} does not contain a list.")
+#             except json.JSONDecodeError as e:
+#                 logging.error(f"Error decoding JSON from {intermediate_file}: {e}")
 
 
 # Store
